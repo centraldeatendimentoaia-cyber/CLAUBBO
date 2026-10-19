@@ -1,0 +1,94 @@
+// Retorno automático: quando um agente de terminal termina um pedido que um agente do Escritório mandou (ex.: Maestro Dev),
+// a resposta final volta sozinha ao remetente como nova mensagem e o acorda (novo turno). Respostas longas vão como resumo +
+// caminho do arquivo com o texto completo. Cada entrega fica em data/cli-retorno-log.jsonl e há um teto de despertares por noite
+// (V2_RETORNO_LIMITE, padrão 20; "noite" = das 06:00 às 06:00) para impedir laço infinito. O teto é contado a partir do próprio
+// log, então reiniciar o app não zera. Só variável de ambiente muda o teto: nenhum agente edita isso.
+import fs from 'node:fs';
+import path from 'node:path';
+import { config } from './config.mjs';
+import { redact } from './transcript.mjs';
+
+const MAX_AGE_MS = 12 * 3600_000; // sem resposta em 12 h: desiste
+const INLINE_CHARS = 3000; // até aqui a resposta vai inteira na mensagem
+const SUMMARY_CHARS = 1200;
+const IDLE_POLLS = 2; // o terminal precisa ser visto ocioso em verificações seguidas (evita pegar pausa entre ferramentas)
+
+export const limitPerNight = () => { const n = Number(process.env.V2_RETORNO_LIMITE); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 20; };
+const pad = (n) => String(n).padStart(2, '0');
+export const nightKey = (ms) => { const d = new Date(ms - 6 * 3600_000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const logFile = () => path.join(config.data, 'cli-retorno-log.jsonl');
+export const filesDir = () => path.join(config.data, 'run', 'respostas');
+
+export function readLog() {
+  try { return fs.readFileSync(logFile(), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
+}
+export function wakesTonight(nowMs) {
+  const k = nightKey(nowMs);
+  return readLog().filter((e) => e.acordou && nightKey(Date.parse(e.at)) === k).length;
+}
+function logReturn(entry) {
+  fs.mkdirSync(path.dirname(logFile()), { recursive: true });
+  fs.appendFileSync(logFile(), JSON.stringify({ at: new Date().toISOString(), ...entry }) + '\n');
+}
+
+/** Corte em fronteira de parágrafo/linha/frase (nunca no meio de palavra). */
+function summarize(text) {
+  if (text.length <= SUMMARY_CHARS) return text;
+  const head = text.slice(0, SUMMARY_CHARS);
+  const at = Math.max(head.lastIndexOf('\n\n'), head.lastIndexOf('\n'), head.lastIndexOf('. '));
+  return (at > SUMMARY_CHARS / 2 ? head.slice(0, at + 1) : head.slice(0, head.lastIndexOf(' '))).trimEnd() + ' […]';
+}
+
+/** Texto da mensagem entregue ao remetente. A resposta é conteúdo de outro agente: vem rotulada, sem valer como ordem. */
+export function buildMessage({ item, text, file }) {
+  const head = `[Retorno automático · pedido ${item.id} · terminal ${item.agentName}]`;
+  if (text.length <= INLINE_CHARS) return `${head}\n${text}`;
+  return `${head}\nA resposta é longa (${text.length} caracteres). Resumo:\n${summarize(text)}\n\nTexto completo em: ${file}\n(Também dá para ler com ler_resposta_agente_cli, agente "${item.agentId}".)`;
+}
+
+function saveFull(item, text) {
+  fs.mkdirSync(filesDir(), { recursive: true });
+  const file = path.join(filesDir(), `retorno-${item.id}.md`).split(path.sep).join('/');
+  fs.writeFileSync(file, `# Resposta do terminal ${item.agentName} ao pedido ${item.id}\n\nPedido de: ${item.from}\n\n---\n\n${text}\n`);
+  return file;
+}
+
+/** Marca o pedido recém-entregue ao terminal para acompanhar a resposta (só se quem pediu é agente do Escritório). */
+export function track(item, isOfficeAgent) {
+  if (item.state === 'sent' && isOfficeAgent(item.from)) { item.retorno = 'aguardando'; item.sentAt = Date.now(); }
+}
+
+const idleSeen = new Map(); // pedido -> verificações ociosas seguidas
+let running = false;
+
+/**
+ * Uma verificação. Injeção de dependências para teste:
+ *  requests: lista (cliRequests); agents: agentes de terminal do snapshot; read(sessionId, desde, ate) -> lastReplySince;
+ *  deliver(to, text, meta, wake) -> entrega ao remetente; save(); now() em ms.
+ */
+export async function tick({ requests, agents, read, deliver, save, now = Date.now }) {
+  if (running) return; running = true;
+  try {
+    const waiting = requests.filter((r) => r.retorno === 'aguardando').sort((a, b) => a.sentAt - b.sentAt);
+    for (const item of waiting) {
+      if (now() - item.sentAt > MAX_AGE_MS) { item.retorno = 'sem_retorno'; save(); logReturn({ pedidoId: item.id, de: item.agentName, para: item.from, resultado: 'sem_retorno (12 h)' }); continue; }
+      if (waiting.some((o) => o !== item && o.agentId === item.agentId && o.sentAt < item.sentAt)) continue; // um pedido por terminal de cada vez
+      const a = agents.find((x) => x.id === item.agentId);
+      if (!a || a.status !== 'idle' || !a.sessionId) { idleSeen.delete(item.id); continue; }
+      const n = (idleSeen.get(item.id) || 0) + 1; idleSeen.set(item.id, n);
+      if (n < IDLE_POLLS) continue;
+      const next = waiting.find((o) => o !== item && o.agentId === item.agentId && o.sentAt > item.sentAt);
+      const r = read(a.sessionId, item.sentAt - 1000, next ? next.sentAt - 1000 : null);
+      if (!r.ok || !r.texto || !r.concluido) continue;
+      const text = redact(r.texto).text;
+      const file = text.length > INLINE_CHARS ? saveFull(item, text) : '';
+      const wake = wakesTonight(now()) < limitPerNight();
+      const res = deliver(item.from, buildMessage({ item, text, file }), { pedidoId: item.id, agente: item.agentName }, wake);
+      idleSeen.delete(item.id);
+      item.retorno = res.ok ? (wake ? 'entregue' : 'entregue_sem_acordar') : 'falhou';
+      item.retornoAt = now(); save();
+      logReturn({ pedidoId: item.id, de: item.agentName, para: item.from, chars: text.length, ...(file ? { arquivo: file } : {}), acordou: !!(res.ok && wake), resultado: item.retorno,
+        ...(!wake ? { motivo: `limite de ${limitPerNight()} despertares por noite atingido` } : {}) });
+    }
+  } finally { running = false; }
+}
