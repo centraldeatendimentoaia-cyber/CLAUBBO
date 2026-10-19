@@ -63,20 +63,40 @@ const SENSITIVE = [
 // "não deixe de fazer deploy" (3 palavras) NÃO é removido e continua indo para o manual.
 // A proibição vale também para a lista que vem logo depois ("não faça push/deploy", "não publicar, deploy ou pagamento"),
 // mas só para substantivos e infinitivos: "não faça deploy e pague o boleto" continua retido (pague é uma ordem).
-const NEG = '(?:nao|nunca|jamais|sem|nem|proibido|evite|evitar)';
+const NEG = '(?:nao|nunca|jamais|sem|nem|nada\\s+de|proibid[oa]s?|vedad[oa]s?|evite|evitar)';
 const LISTED = '(?:deploy\\w*|depl[oi]y\\w*|git\\s+push|push|publicacao|publicar|publicando|publish\\w*|producao|release|lancamento|lancar|pagamento\\w*|pagar|cobrar|apagar|deletar|excluir|remover|destruir)';
 const LIST_TAIL = `(?:\\s*(?:[/,]|\\b(?:ou|e|nem)\\b)\\s*${LISTED}\\b)*`;
 const NEGATED = SENSITIVE.map(([, re]) => new RegExp(`\\b${NEG}\\s+(?:[^\\s,.;:!?()\\n]+\\s+){0,2}?(?:${re.source})${LIST_TAIL}`, 'g'));
-const withoutNegated = (t) => NEGATED.reduce((s, re) => s.replace(re, ' '), t);
+// Negação DEPOIS do termo ("commit local sim, push NÃO, nada de publicar"): só quando o termo abre a oração (começo do texto
+// ou depois de vírgula, ponto, dois-pontos, parêntese ou quebra de linha) e o "não" fecha a oração. "faça push não" ou
+// "rode o deploy, não o commit" NÃO são removidos e continuam retidos.
+const NEGATED_AFTER = SENSITIVE.map(([, re]) => new RegExp(`(?<=(?:^|[,;:.(\\n])\\s*)(?:${re.source})\\s*:?\\s*(?:nao|proibid[oa]s?|vedad[oa]s?)(?=\\s*(?:[,.;)\\n]|$))`, 'g'));
+
+/** Tira do texto (já normalizado) as proibições e devolve o que sobrou e os trechos removidos, para o registro. */
+function stripNegated(t) {
+  const ignorados = [];
+  const out = [...NEGATED, ...NEGATED_AFTER].reduce((s, re) => s.replace(re, (m) => { ignorados.push(m.trim().slice(0, 60)); return ' '; }), t);
+  return { out, ignorados };
+}
+
+/**
+ * Decisão do modo automático para um pedido: { liberado: true, ignorados } ou { liberado: false, why, trecho, ignorados }.
+ * `trecho` é o que acionou o filtro; `ignorados` são os trechos lidos como proibição (ex.: "sem push") e por isso não seguram.
+ * Na dúvida (proibição misturada com ação, folga maior que o aceito) o termo sobra e o pedido é retido.
+ */
+export function decideAuto(text) {
+  const { out, ignorados } = stripNegated(norm(text));
+  for (const [why, re] of SENSITIVE) {
+    const m = re.exec(out);
+    if (m) return { liberado: false, why, trecho: m[0].trim().slice(0, 60), ignorados };
+  }
+  return { liberado: true, ignorados };
+}
 
 /** Se o pedido exige clique do João mesmo no automático: { why, trecho } (o trecho que acionou o filtro); senão null. */
 export function manualHit(text) {
-  const t = withoutNegated(norm(text));
-  for (const [why, re] of SENSITIVE) {
-    const m = re.exec(t);
-    if (m) return { why, trecho: m[0].trim().slice(0, 60) };
-  }
-  return null;
+  const d = decideAuto(text);
+  return d.liberado ? null : { why: d.why, trecho: d.trecho };
 }
 
 /** Devolve o motivo (string) se o pedido exige clique do João mesmo no automático; senão null. */

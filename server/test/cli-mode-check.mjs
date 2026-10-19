@@ -75,6 +75,11 @@ try {
     assert.equal(r.body.estado, 'esperando_aprovacao', t);
   }
   assert.equal(delivered.length, 1);
+  // o log do automático registra também cada retenção, com o motivo e o trecho
+  const log2 = fs.readFileSync(path.join(tmp, 'data', 'cli-auto-log.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(log2[0].decisao, 'liberado');
+  const heldLog = log2.find((x) => x.text === 'faça o deploy do site');
+  assert.equal(heldLog.decisao, 'retido'); assert.equal(heldLog.motivo, 'deploy / publicação'); assert.equal(heldLog.trecho, 'deploy');
   const lista = (await call('/api/cli/requests')).body.requests;
   assert.ok(lista.filter((x) => x.state === 'pending' && x.text !== 'rode os testes do projeto').every((x) => x.manualReason));
   // 5) o clique do João ainda entrega um pedido pendente

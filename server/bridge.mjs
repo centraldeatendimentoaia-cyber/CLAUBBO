@@ -26,7 +26,7 @@ import { readJson, writeJson } from './core/store.mjs';
 import { approve, createTask, listTasks, reject, removeTask, retryWithTools, setProjectResolver } from './core/tasks.mjs';
 import { lastReplySince, readReplies } from './core/transcript.mjs';
 import { tick as returnTick, track as trackReturn } from './core/retorno.mjs';
-import { getMode, logAuto, manualHit, modeLog, setMode } from './core/cli-mode.mjs';
+import { decideAuto, getMode, logAuto, modeLog, setMode } from './core/cli-mode.mjs';
 import { addOffice, listOffices, removeOffice, updateOffice } from './core/offices.mjs';
 import { displayName, renameRoom } from './core/room-aliases.mjs';
 import { accountEmail } from './core/account-email.mjs';
@@ -728,13 +728,17 @@ ${logs}` : ''}`;
     if (cliRequests.filter((r) => r.state === 'pending').length >= 10) return json(res, 429, { error: 'há pedidos demais esperando aprovação' });
     const item = { id: crypto.randomUUID().slice(0, 8), at: Date.now(), from: String(from || 'agente').slice(0, 40), agentId, agentName: target.name, room: target.roomId, text: msg, state: 'pending' };
     // modo AUTOMÁTICO (ligado só pelo João na página): entrega sem clique, exceto pedido que menciona deploy/publicação/pagamento/apagar
-    const hit = getMode().mode === 'auto' ? manualHit(msg) : null;
+    const decision = getMode().mode === 'auto' ? decideAuto(msg) : null;
+    const hit = decision && !decision.liberado ? decision : null;
     const why = hit?.why ?? null;
+    // cada decisão do automático vai para data/cli-auto-log.jsonl: liberado (com o que foi lido como proibição) ou retido (palavra e trecho)
+    const base = { pedidoId: item.id, agentId: item.agentId, agentName: item.agentName, from: item.from, text: item.text };
+    if (hit) logAuto({ ...base, decisao: 'retido', motivo: hit.why, trecho: hit.trecho, ignorados: hit.ignorados });
     if (getMode().mode === 'auto' && !why) {
       item.auto = true;
       cliRequests.push(item);
       await deliverCli(item);
-      logAuto({ pedidoId: item.id, agentId: item.agentId, agentName: item.agentName, from: item.from, text: item.text, resultado: item.state, ...(item.error ? { erro: item.error } : {}) });
+      logAuto({ ...base, decisao: 'liberado', ignorados: decision.ignorados, resultado: item.state, ...(item.error ? { erro: item.error } : {}) });
       return json(res, 201, { ok: item.state === 'sent', pedidoId: item.id, estado: item.state === 'sent' ? 'enviado_automaticamente' : 'falhou', aviso: item.state === 'sent' ? 'Modo automático: o pedido foi entregue ao terminal sem esperar o João (fica registrado em log). Quando o terminal terminar, a resposta volta sozinha para você como nova mensagem.' : `Não foi possível entregar: ${item.error}` });
     }
     if (why) { item.manualReason = why; item.manualTrecho = hit.trecho; }
