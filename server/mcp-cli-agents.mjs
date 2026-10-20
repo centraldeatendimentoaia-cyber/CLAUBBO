@@ -17,7 +17,8 @@ import nodePath from 'node:path';
 import { config } from './core/config.mjs';
 
 const BRIDGE = process.env.BRIDGE_URL || 'http://127.0.0.1:4530';
-const FROM = process.env.AGENT_ID || 'agente';
+// Sem AGENT_ID, quem pede é a sessão do Claude Code que iniciou este MCP (processo pai): a resposta volta para ela.
+const FROM = process.env.AGENT_ID || `.claude:${process.ppid}`;
 
 // Token dos agentes (data/acesso.json): só vale para criar pedidos e propostas, que esperam o clique do João. Relido a cada chamada.
 const agentToken = () => { try { return JSON.parse(fs.readFileSync(nodePath.join(config.data, 'acesso.json'), 'utf8')).agentes || ''; } catch { return ''; } };

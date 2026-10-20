@@ -312,11 +312,18 @@ const cliAgents = () => (state.snapshot?.agents || []).filter((a) => !a.id.start
 async function deliverCli(item) {
   const r = await habCall('/api/messages', { method: 'POST', body: JSON.stringify({ agentId: item.agentId, text: item.text }) }).catch(() => null);
   if (r?.status === 201) { item.state = 'sent'; if (r.body?.id) habOutbox.add(r.body.id); } else { item.state = 'failed'; item.error = r?.body?.error || (habUp === false ? HAB_AVISO : 'Claubbo indisponível'); }
-  trackReturn(item, (id) => !!getAgent(id)); // a resposta do terminal volta sozinha a quem pediu (core/retorno.mjs)
+  trackReturn(item, (id) => !!getAgent(id) || isTerminalId(id)); // a resposta do terminal volta sozinha a quem pediu (core/retorno.mjs)
   saveCli();
 }
 /** Devolve aos remetentes as respostas dos terminais que já terminaram o pedido (a cada 3 s). */
-const checkReturns = () => returnTick({ requests: cliRequests, agents: cliAgents(), read: lastReplySince, deliver: receiveReturn, save: saveCli }).catch((e) => console.error('retorno:', e?.message));
+// Quem pediu é uma sessão do Claude Code (id ".claude:<pid>"): a resposta volta como mensagem ao próprio terminal, pelo Habblaud.
+const isTerminalId = (id) => /^\.claude:\d+$/.test(String(id || ''));
+const deliverReturn = (to, text, meta, wake) => {
+  if (!isTerminalId(to)) return receiveReturn(to, text, meta, wake);
+  habCall('/api/messages', { method: 'POST', body: JSON.stringify({ agentId: to, text }) }).catch((e) => console.error('retorno->terminal:', e?.message));
+  return { ok: true };
+};
+const checkReturns = () => returnTick({ requests: cliRequests, agents: cliAgents(), read: lastReplySince, deliver: deliverReturn, save: saveCli }).catch((e) => console.error('retorno:', e?.message));
 const PROP_FILE = path.join(config.data, 'agent-proposals.json');
 let agentProposals = readJson(PROP_FILE, []);
 const saveProps = () => writeJson(PROP_FILE, agentProposals.slice(-50));
