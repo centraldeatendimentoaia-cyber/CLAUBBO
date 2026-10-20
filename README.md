@@ -2,6 +2,8 @@
 
 Escritório local de agentes de IA, só seu, com o visual e a vida dos personagens do Claubbo. Você cria agentes, dá tarefas, faz reuniões e monta as salas como quiser. Cada agente usa a conta (Claude Code ou Codex) que você escolher.
 
+Instalação em máquina nova com um único prompt: veja [`INSTALAR.md`](INSTALAR.md).
+
 ## Rodar
 
 ```
