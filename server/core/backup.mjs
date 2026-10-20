@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SKIP = new Set(['backups', 'run', 'timeline', 'entregas']);
+const SKIP = new Set(['backups', 'run', 'timeline', 'entregas', 'acesso.json']); // acesso.json = tokens da instalação: nunca vão para cópia
 const NAME = /^\d{4}-\d{2}-\d{2}_\d{6}(-antes-de-restaurar)?$/;
 const pad = (n) => String(n).padStart(2, '0');
 

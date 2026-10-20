@@ -86,6 +86,40 @@ assert.equal(history('maestro').filter((m) => m.auto === 'terminal').length, 4);
 const log = readLog();
 assert.equal(log.length, 4); assert.ok(log.every((e) => !Number.isNaN(Date.parse(e.at)) && e.pedidoId && e.para === 'maestro'));
 assert.equal(log.filter((e) => e.acordou).length, 3); assert.match(log.at(-1).motivo, /limite/); assert.equal(log.at(-1).resultado, 'entregue_sem_acordar');
+// o log diz qual limite barrou e para qual agente
+assert.equal(log.at(-1).limite, 'noite'); assert.equal(log.at(-1).max, 3); assert.match(log.at(-1).motivo, /por noite atingido para maestro/);
+
+// ---- 5b) a conta é POR AGENTE: com o maestro no teto, outro agente ainda é acordado
+assert.ok(createAgent({ id: 'outro', name: 'Outro', role: 'Dev' }).ok);
+const ot = mk('o1', 'outro'); track(ot, () => true); reqs.length = 0; reqs.push(ot); reply = { ok: true, texto: 'resposta do outro', concluido: true };
+await tick(deps()); await tick(deps());
+assert.equal(delivered.at(-1).to, 'outro'); assert.equal(delivered.at(-1).wake, true); assert.equal(ot.retorno, 'entregue');
+await until(() => history('outro').some((m) => m.who === 'agent'), 'outro agente acordado respondeu');
+assert.equal(readLog().at(-1).para, 'outro'); assert.equal(readLog().at(-1).acordou, true);
+
+// ---- 5c) freio de rajada: acima de N despertares na janela de 10 min, o seguinte só é guardado; o log diz "rajada"
+assert.ok(createAgent({ id: 'rajada', name: 'Rajada', role: 'Dev' }).ok);
+const burst = { rajada: 2 };
+for (const id of ['b1', 'b2', 'b3']) {
+  const r = mk(id, 'rajada'); track(r, () => true); reqs.length = 0; reqs.push(r); reply = { ok: true, texto: `resposta ${id}`, concluido: true };
+  const d2 = () => ({ ...deps(), limites: burst });
+  await tick(d2()); await tick(d2());
+}
+assert.deepEqual(delivered.slice(-3).map((x) => x.wake), [true, true, false]);
+const rl = readLog().filter((e) => e.para === 'rajada');
+assert.equal(rl.length, 3); assert.equal(rl.at(-1).acordou, false); assert.equal(rl.at(-1).limite, 'rajada'); assert.equal(rl.at(-1).max, 2);
+assert.match(rl.at(-1).motivo, /2 despertares em 10 min atingido para rajada/);
+const { wakeDecision, wakesRecent, limitPerNight, limitBurst } = await import('../core/retorno.mjs');
+assert.equal(wakeDecision('rajada', Date.now(), burst).limite, 'rajada');
+assert.equal(wakesRecent(Date.now(), 'rajada'), 2);
+assert.equal(wakesRecent(Date.now() + 11 * 60_000, 'rajada'), 0); // passou a janela de 10 min: libera de novo
+assert.equal(wakeDecision('rajada', Date.now() + 11 * 60_000, burst).wake, true);
+assert.equal(wakeDecision('rajada', Date.now(), { noite: 2, rajada: 99 }).limite, 'noite'); // o teto noturno também vale
+assert.equal(wakeDecision('ninguem', Date.now(), { noite: 0 }).wake, false); // 0 bloqueia tudo
+// padrões: 100 por noite e 5 por 10 minutos, por agente (o teste usa 3 só pela variável de ambiente)
+const keep = process.env.V2_RETORNO_LIMITE; delete process.env.V2_RETORNO_LIMITE;
+assert.equal(limitPerNight(), 100); assert.equal(limitBurst(), 5);
+process.env.V2_RETORNO_LIMITE = keep;
 
 // ---- 6) dois pedidos ao mesmo terminal: o segundo espera o primeiro e usa a janela depois dele
 const T0 = Date.now() - 10_000;
@@ -113,6 +147,8 @@ assert.deepEqual([lr.ok, lr.texto, lr.concluido], [true, 'Resposta final do pedi
 assert.equal(lastReplySince(SID, 3_000_000).texto, '');
 assert.ok(buildMessage({ item: mk('z', 'maestro'), text: 'curta', file: '' }).startsWith('[Retorno automático · pedido z · terminal Marcelo]'));
 
+await until(() => history('rajada').filter((m) => m.who === 'agent').length >= 2, 'turnos do agente rajada terminaram'); // os despertares ainda rodam o Claude falso
+await new Promise((r) => setTimeout(r, 400));
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('retorno-check: ok');
 process.exit(0);

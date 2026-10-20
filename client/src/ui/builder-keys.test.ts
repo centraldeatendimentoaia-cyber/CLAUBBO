@@ -119,6 +119,17 @@ describe('atalhos do modo mobiliar', () => {
     }
   });
 
+  it('foco no seletor de cor (ou checkbox/slider) não bloqueia os atalhos', () => {
+    for (const type of ['color', 'checkbox', 'range']) {
+      const { i, key } = make([{ ...desk }]);
+      i.selected = 'd1';
+      key('r', 'INPUT', { target: { tagName: 'INPUT', type } });
+      expect(i.items[0].dir, type).toBeDefined();
+      key('Delete', 'INPUT', { target: { tagName: 'INPUT', type } });
+      expect(i.items, type).toHaveLength(0);
+    }
+  });
+
   it('erro antigo não trava a contagem: cada ação limpa o aviso', () => {
     const { i, key, status } = make([{ ...desk }]);
     i.selected = 'd1';

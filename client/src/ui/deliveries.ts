@@ -73,7 +73,8 @@ export function projectName(path: string | undefined): string {
 
 /** "15 passos · 3 arquivos · 12 min" (o que interessa a quem recebe). */
 export function workLine(d: Pick<DeliveryInfo, 'tools' | 'edited' | 'startedAt' | 'finishedAt'>): string {
-  const parts = [d.tools === 1 ? tr('1 passo') : tr('{0} passos', [d.tools])];
+  // O Escritório v2 não conta os passos de uma tarefa (tools vem 0): "0 passos" seria um dado inventado, então some.
+  const parts = d.tools > 0 ? [d.tools === 1 ? tr('1 passo') : tr('{0} passos', [d.tools])] : [];
   if (d.edited) parts.push(d.edited === 1 ? tr('1 arquivo alterado') : tr('{0} arquivos alterados', [d.edited]));
   const ms = d.finishedAt - d.startedAt;
   if (ms >= 60_000) parts.push(formatDuration(ms));
@@ -130,6 +131,7 @@ export class Deliveries implements UiComponent {
   private current: DeliveryInfo | null = null;
   private viewIndex = 0;
   private available = false;
+  private closedAt = 0;
 
   constructor(
     private readonly ctx: UiContext,
@@ -159,6 +161,10 @@ export class Deliveries implements UiComponent {
       this.empty,
       this.listEl,
     );
+    // `beforetoggle` dispara na hora em que o toque fora fecha o popover; `toggle` chega só depois do clique do botão
+    this.panel.addEventListener('beforetoggle', (e) => {
+      if ((e as ToggleEvent).newState === 'closed') this.closedAt = performance.now();
+    });
     this.panel.addEventListener('toggle', () => {
       this.button.setAttribute('aria-expanded', String(this.panelOpen));
       this.button.classList.toggle('is-on', this.panelOpen);
@@ -274,6 +280,8 @@ export class Deliveries implements UiComponent {
 
   private togglePanel(): void {
     if (this.panelOpen) return this.hidePanel();
+    // clicar no botão com a lista aberta já a fecha pelo "toque fora" do popover; sem isto o mesmo clique a reabriria
+    if (performance.now() - this.closedAt < 300) return;
     this.renderList();
     const r = this.button.getBoundingClientRect();
     this.panel.style.top = `${Math.round(r.bottom + 8)}px`;

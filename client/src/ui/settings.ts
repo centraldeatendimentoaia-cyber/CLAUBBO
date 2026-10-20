@@ -6,6 +6,7 @@ import { h, iconButton, setAttr, setHidden, setText } from './dom';
 import { ICONS } from './icons';
 import { notificationState, type Notifier } from './notify';
 import type { UiPrefs } from './prefs';
+import { PetsSettingsGroup } from './settings-pets';
 import { SoundSettingsGroup } from './settings-sound';
 import type { SoundControl } from './sound';
 import { AboutGroup } from './version';
@@ -91,6 +92,7 @@ export class SettingsPopover implements UiComponent {
   private theme: ReturnType<typeof segmented<UiPrefs['theme']>>;
   private language: ReturnType<typeof segmented<LanguageChoice>>;
   private soundGroup: SoundSettingsGroup;
+  private petsGroup: PetsSettingsGroup;
   private demoGroup: HTMLElement;
   /** Só na página do celular (porta remota com login): sair deste aparelho. */
   private remoteGroup: HTMLElement;
@@ -152,6 +154,7 @@ export class SettingsPopover implements UiComponent {
     );
     this.theme.row.append(h('span', { class: 'ui-set__hint', text: tr('Automático: Halloween em outubro e Natal de 1º de novembro a 26 de dezembro; no resto do ano, o visual original. Nenhum: sempre o original.') }));
     this.soundGroup = new SoundSettingsGroup(ctx, sound);
+    this.petsGroup = new PetsSettingsGroup(ctx);
 
     // Nomes dos idiomas sempre na própria língua, para quem não entende o idioma atual achar o seu.
     this.language = segmented<LanguageChoice>(
@@ -212,6 +215,7 @@ export class SettingsPopover implements UiComponent {
         h('h3', { text: tr('Avisos') }),
         sw('browserNotifications', tr('Notificações do navegador'), tr('Avisa quando alguém precisa de você e a aba está em segundo plano.'), () => void this.toggleNotifications()),
       ),
+      this.petsGroup.el,
       this.soundGroup.el,
       h('div', { class: 'ui-set-group' }, h('h3', { text: tr('Idioma') }), this.language.row),
       this.demoGroup,
@@ -287,6 +291,7 @@ export class SettingsPopover implements UiComponent {
     this.theme.set(p.theme);
     this.language.set(savedLanguage());
     this.soundGroup.render();
+    this.petsGroup.render();
     setHidden(this.demoGroup, this.ctx.store.mock || access().remote);
     setHidden(this.remoteGroup, !access().remote);
     this.about.render();

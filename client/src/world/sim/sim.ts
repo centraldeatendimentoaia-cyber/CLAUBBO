@@ -4,6 +4,8 @@ import { partsKey } from '../../../../shared/appearance';
 import type { AgentInfo, OfficeSnapshot, Provider, RoomInfo } from '../../../../shared/types';
 import type { ArtModule, Dir, RoomTheme } from '../../art/api';
 import type { WorldOptions } from '../api';
+import { PET_SOCIAL, pickVisitKind, type PetVisitKind } from '../pets/config';
+import { PetManager, type Pet } from '../pets/pets';
 import { COL_W, COMPACT_DELAY_MS, DISMANTLE_DELAY_MS, FOOT_DX, FOOT_DY, MISSING_DEBOUNCE_MS, RUN_SPEED, TILE, WALK_SPEED } from '../constants';
 import { assembleBuilding, type BuildingLayout } from '../layout/building';
 import { RECEPTION_ID } from '../layout/core';
@@ -59,6 +61,11 @@ export interface SimMode {
    * de quem está à toa há muito tempo, cronômetro do balão); mais o visitante e as luzes da visita.
    */
   visit?: boolean;
+  /**
+   * Andar que esta simulação cuida (1 = Escritório, 2 = terminais): só as salas e os agentes dele entram. O mundo mantém uma
+   * simulação por andar, todas rodando, e trocar de andar só troca qual delas é desenhada. Ausente = o andar escolhido (floor.ts).
+   */
+  floor?: number;
 }
 
 /** Luzes da visita: 'away' (pausado) apaga tudo; 'discreet' acende as salas vazias; 'live' é o `Sim` de sempre. */
@@ -152,12 +159,28 @@ export class Sim {
     mode: SimMode = {},
   ) {
     this.visit = !!mode.visit;
+    this.pinnedFloor = mode.floor ?? null;
     this.social = new Social(this, storage);
     this.building = assembleBuilding(columnsFor([]), [], 0);
     this.finder = new PathFinder(this.building.grid);
     this.spots.setSpots(this.building.spots);
     for (const s of this.spots.ofKind('elevator')) this.elevators.push(new Elevator(this.elevators.length, s.id));
   }
+
+  private readonly pinnedFloor: number | null;
+  /** Pets do andar desta simulação (ver pets/pets.ts): usam a mesma grade e o mesmo A* dos personagens. */
+  readonly pets = new PetManager(
+    {
+      grid: () => this.building.grid,
+      finder: () => this.finder,
+      people: () => this.people(),
+      person: (id) => this.chars.get(id),
+      rooms: () => [...this.rooms.values()].filter((r) => r.phase === 'ready' && r.listed && !r.ghost).map((r) => r.layout.rect),
+      liveliness: () => this.options().liveliness,
+    },
+    () => this.pinnedFloor ?? getFloor(),
+  );
+  private petsCfg: unknown = undefined;
 
   // =================================================================== snapshot
 
@@ -168,7 +191,7 @@ export class Sim {
       snap = { ...snap, agents: snap.agents.map((a) => (patches.has(a.id) ? { ...a, ...patches.get(a.id) } : a)) };
     }
     // um andar por vez: salas e agentes do outro andar saem de cena (as salas se desmontam e as de lá se montam)
-    const floor = getFloor();
+    const floor = this.pinnedFloor ?? getFloor();
     const elsewhere = new Set(snap.rooms.filter((r) => (r.floor ?? 1) !== floor).map((r) => r.id));
     if (elsewhere.size) snap = { ...snap, rooms: snap.rooms.filter((r) => !elsewhere.has(r.id)), agents: snap.agents.filter((a) => !elsewhere.has(a.roomId)) };
     this.lastSnapshot = input;
@@ -619,6 +642,14 @@ export class Sim {
       this.runCharacter(ch, dt, now);
     }
     if (this.visitor) this.runVisitor(this.visitor, dt, now);
+    if (!this.visit) {
+      const cfg = this.options().pets;
+      if (cfg !== this.petsCfg) {
+        this.petsCfg = cfg;
+        this.pets.sync(cfg);
+      }
+      this.pets.update(dt, now, this.layoutVersion);
+    }
     for (const [id, ch] of this.chars) {
       if (ch.gone) {
         this.spots.releaseAll(id);
@@ -1532,6 +1563,8 @@ export class Sim {
     const near = { tx: ch.tx, ty: ch.ty };
     const rng = ch.rng;
     const persona = personaFor(ch.info.seed);
+    // pet por perto: o tutor (e, bem mais raramente, outro agente) vai vê-lo antes de pensar em companhia
+    if (this.pets.list.length && this.planPetVisit(ch, now)) return true;
     // colegas à toa: a vontade é de companhia (a personalidade dosa) — TV, jogo, papo, aposta...
     if (this.social.hasCompany(ch, now) && rng() < 0.45 + persona.sociability * 0.4 && this.social.tryInitiate(ch, now, false)) return true;
     const avail: Partial<Record<IdleActivity, boolean>> = {
@@ -1682,6 +1715,49 @@ export class Sim {
     ch.queue.push(...steps);
     this.pushHome(ch, carry);
     void now;
+    return true;
+  }
+
+  /**
+   * Passeio até um pet: o tutor faz carinho, brinca ou dá comida; outro agente só cumprimenta (e bem mais raramente).
+   * Só quem está ocioso chega aqui (planOuting). O pet espera parado e volta à vida normal ao fim (ou se o agente
+   * for chamado ao trabalho: PetManager libera a visita sozinho).
+   */
+  private planPetVisit(ch: Character, now: number): boolean {
+    const cands = this.pets.visitable(now);
+    if (!cands.length) return false;
+    const mine = cands.filter((p) => p.tutorId === ch.id);
+    let pool: Pet[] = [];
+    if (mine.length && ch.rng() < PET_SOCIAL.tutorVisitChance) pool = mine;
+    else if (ch.rng() < PET_SOCIAL.strangerVisitChance) pool = cands.filter((p) => p.tutorId !== ch.id && Math.abs(p.tx - ch.tx) + Math.abs(p.ty - ch.ty) <= PET_SOCIAL.strangerMaxTiles);
+    if (!pool.length) return false;
+    const pet = pool[Math.floor(ch.rng() * pool.length)];
+    const from = ch.atSpot ? this.spots.get(ch.atSpot) : null;
+    const sx = from ? from.tx : ch.tx;
+    const sy = from ? from.ty : ch.ty;
+    const path: number[] = [];
+    const tile = this.pets.approachTiles(pet).find((t) => this.finder.find(sx, sy, t.x, t.y, path));
+    if (!tile) return false;
+    const kind: PetVisitKind = pickVisitKind(ch.rng, pet.tutorId === ch.id);
+    const [lo, hi] = { carinho: PET_SOCIAL.carinhoMs, brincar: PET_SOCIAL.brincarMs, comida: PET_SOCIAL.comidaMs, cumprimento: PET_SOCIAL.cumprimentoMs }[kind];
+    const ms = between(ch.rng, lo, hi);
+    const look: Record<PetVisitKind, { pose: 'use' | 'laugh' | 'stand'; icon: 'heart' | 'star' | 'sparkle' | 'wave' }> = {
+      carinho: { pose: 'use', icon: 'heart' },
+      brincar: { pose: 'laugh', icon: 'star' },
+      comida: { pose: 'use', icon: 'sparkle' },
+      cumprimento: { pose: 'stand', icon: 'wave' },
+    };
+    this.pets.claim(pet, ch.id, now, (path.length / 2) * 450 + 3000 + ms);
+    const steps: Step[] = [];
+    this.pushLeave(ch, steps);
+    steps.push(
+      { t: 'go', tx: tile.x, ty: tile.y },
+      { t: 'do', fn: () => this.pets.meet(pet, ch.id, kind, this.now, ms) },
+      { t: 'act', pose: look[kind].pose, ms, dir: facing(tile.x, tile.y, pet.tx, pet.ty), icon: look[kind].icon },
+      { t: 'do', fn: () => this.pets.release(pet, ch.id, this.now) },
+    );
+    ch.queue.push(...steps);
+    this.pushHome(ch, 'none');
     return true;
   }
 

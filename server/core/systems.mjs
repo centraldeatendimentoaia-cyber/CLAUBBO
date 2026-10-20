@@ -8,6 +8,7 @@
 //  - Reerguer tenta até MAX_ATTEMPTS vezes com espera crescente; esgotou, avisa e para de tentar.
 import net from 'node:net';
 import { spawn as nodeSpawn, execFile } from 'node:child_process';
+import { cleanCommand } from './system-config.mjs';
 
 export const MAX_ATTEMPTS = 3;
 export const BACKOFF_MS = [30_000, 60_000, 120_000];
@@ -85,6 +86,8 @@ export function createSystems({
   /** Sobe o processo do comando cadastrado. Não decide nada: quem chama já conferiu as regras. */
   function launch(a, s) {
     const sys = a.system;
+    const ok = cleanCommand(sys.command); // confere de novo na hora de rodar: o agents.json pode ter vindo de antes da lista permitida
+    if (!ok.ok) { log(s, `[escritório] comando recusado: ${ok.error}`); setStatus(s, 'down'); s.desired = false; persist(); return false; }
     log(s, `[escritório] subindo: ${sys.command}`);
     const child = spawn(sys.command, { cwd: sys.folder, env: process.env });
     s.child = child;
@@ -95,6 +98,7 @@ export function createSystems({
     child.on('error', (e) => log(s, `[escritório] não consegui rodar o comando: ${e.message}`));
     child.on('exit', (code) => { log(s, `[escritório] o processo terminou (código ${code ?? '?'})`); if (s.child === child) { s.child = null; s.pid = null; persist(); } });
     persist();
+    return true;
   }
 
   const fail = (status, error) => ({ ok: false, status, error });
@@ -102,6 +106,8 @@ export function createSystems({
   async function start(id) {
     const a = agentOf(id);
     if (a?.system?.type !== 'local') return fail(400, 'este agente não tem um sistema local');
+    const cmd = cleanCommand(a.system.command);
+    if (!cmd.ok) return fail(400, cmd.error);
     const s = stateOf(id);
     if (await probe.port(a.system.port)) { setStatus(s, 'up'); s.desired = true; persist(); return { ok: true, already: true }; }
     if (s.child) return fail(409, 'o sistema já está subindo');
@@ -109,8 +115,7 @@ export function createSystems({
     s.attempts = 0;
     s.notifiedDown = false;
     setStatus(s, 'restarting');
-    launch(a, s);
-    return { ok: true };
+    return launch(a, s) ? { ok: true } : fail(400, 'comando recusado');
   }
 
   async function stop(id) {

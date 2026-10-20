@@ -7,7 +7,7 @@ type Say = (text: string, bad?: boolean) => void;
 /** Diz se esta tela ainda é a que está aberta (a resposta do servidor pode chegar depois de trocar de aba). */
 type Live = () => boolean;
 
-const CATEGORY: Record<string, string> = { direcao: 'Direção e operação', marketing: 'Marketing', produto: 'Produto e tecnologia', vendas: 'Vendas e atendimento', administrativo: 'Administrativo', inteligencia: 'Inteligência' };
+const CATEGORY: Record<string, string> = { direcao: 'Direção e operação', marketing: 'Marketing', design: 'Design UI/UX', copy: 'Copy e conteúdo', vendas: 'Vendas', atendimento: 'Atendimento e suporte', administrativo: 'Administrativo, financeiro e jurídico', operacoes: 'Operações', produto: 'Produto e tecnologia', inteligencia: 'Inteligência e dados' };
 
 const post = async (url: string, method: string, body: unknown): Promise<{ ok: boolean; data: Record<string, unknown> }> => {
   const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

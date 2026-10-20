@@ -25,3 +25,23 @@ describe('catálogo de agentes (arquivo real)', () => {
     expect(text).not.toMatch(/costume|"command"|sk-ant-|api[_-]?key\s*[:=]|password\s*[:=]/i);
   });
 });
+
+describe('catálogo ampliado', () => {
+  const all = loadCatalog() as Array<{ id: string; category: string; brief: string; name: string; needs: string[]; tools: string[] }>;
+  it('todo item cai numa categoria conhecida (nenhum foi rebaixado a "administrativo" por engano)', () => {
+    const byId = new Map(raw.map((r) => [String(r.id), String(r.category)]));
+    for (const a of all) expect(a.category, a.id).toBe(byId.get(a.id));
+  });
+  it('tem as áreas pedidas com a lista mínima', () => {
+    const ids = new Set(all.map((a) => a.id));
+    for (const id of ['gestor-meta-ads', 'gestor-google-ads', 'seo', 'social-media', 'ux-researcher', 'ui-designer', 'ux-writer', 'auditor-acessibilidade', 'copy-vendas', 'roteirista-reels', 'naming-slogans', 'redator-de-blog', 'sdr', 'atendimento-ao-cliente', 'financeiro', 'juridico', 'rh-recrutamento']) expect(ids.has(id), id).toBe(true);
+    expect(all.length).toBeGreaterThanOrEqual(60);
+  });
+  it('instrução específica (comprimento e seções) e ferramenta de conta exige "needs"', () => {
+    for (const a of all) {
+      expect(a.brief.length, a.id).toBeGreaterThan(600);
+      expect(a.brief, a.id).toMatch(/Missão:.*Como trabalha:.*Nunca:.*Quando pergunta ao dono:/s);
+      for (const t of a.tools) if (['meta-ads', 'google-ads', 'supabase', 'saiae-crm', 'higgsfield', 'vercel'].includes(t)) expect(a.needs, `${a.id} usa ${t}`).toContain(t);
+    }
+  });
+});

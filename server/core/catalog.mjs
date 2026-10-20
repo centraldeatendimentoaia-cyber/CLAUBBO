@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createAgent, getAgent, loadAgents } from './agents.mjs';
 
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'catalog', 'agentes.json');
-export const CATEGORIES = ['direcao', 'marketing', 'produto', 'vendas', 'administrativo', 'inteligencia'];
+export const CATEGORIES = ['direcao', 'marketing', 'design', 'copy', 'vendas', 'atendimento', 'administrativo', 'operacoes', 'produto', 'inteligencia'];
 const ID = /^[a-z0-9][a-z0-9-]{0,30}$/;
 const text = (v, max) => String(v ?? '').replace(/\r\n/g, '\n').trim().slice(0, max);
 const names = (v, max, len = 40) => (Array.isArray(v) ? v.map((x) => text(x, len)).filter(Boolean).slice(0, max) : []);

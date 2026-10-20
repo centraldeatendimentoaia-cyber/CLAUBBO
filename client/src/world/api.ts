@@ -4,6 +4,8 @@
 
 export type Selection = { type: 'agent'; id: string } | { type: 'room'; id: string } | null;
 
+import type { PetsConfig } from './pets/config';
+
 export interface WorldOptions {
   /** Mostrar etiquetas com os nomes dos personagens. */
   showNames: boolean;
@@ -19,6 +21,8 @@ export interface WorldOptions {
   daylight?: DaylightMode;
   /** Tema visual: automático (segue o calendário; ver seasonalThemeFor), nenhum, Natal ou Halloween. */
   theme?: OfficeTheme;
+  /** (Opcional, aditivo) Pets pelo escritório (ver world/pets/config.ts). Ausente = sem pets. */
+  pets?: PetsConfig;
 }
 
 /** Tema que o renderer desenha: o escritório original ('none') ou um dos sazonais. */

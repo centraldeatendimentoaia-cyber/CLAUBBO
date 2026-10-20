@@ -3,6 +3,7 @@
 import { DEFAULT_SOUND_SETTINGS, sanitizeSoundSettings, type SoundSettings } from '../audio/scheduler';
 import type { DaylightMode, WorldOptions } from '../world/api';
 import { DEFAULT_WORLD_OPTIONS } from '../world/api';
+import { DEFAULT_PETS, sanitizePets, type PetsConfig } from '../world/pets/config';
 
 export const PREFS_KEY = 'claubbo:prefs';
 
@@ -25,6 +26,8 @@ export interface UiPrefs {
   hiddenAccounts: string[];
   /** Claubbo World: aviso quando o primeiro visitante entra no seu prédio (a cada conexão). Ligado por padrão. */
   worldVisitNotify: boolean;
+  /** Pets pelo escritório: ligado/desligado, quais, nomes e andar (world/pets/config.ts). */
+  pets: PetsConfig;
 }
 
 export const DEFAULT_PREFS: UiPrefs = {
@@ -40,6 +43,7 @@ export const DEFAULT_PREFS: UiPrefs = {
   feedOpen: true,
   hiddenAccounts: [],
   worldVisitNotify: true,
+  pets: DEFAULT_PETS,
 };
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -66,6 +70,7 @@ export function sanitizePrefs(raw: unknown): UiPrefs {
     feedOpen: bool(o.feedOpen, d.feedOpen),
     hiddenAccounts: Array.isArray(o.hiddenAccounts) ? o.hiddenAccounts.filter((x): x is string => typeof x === 'string').slice(0, 20) : [],
     worldVisitNotify: bool(o.worldVisitNotify, d.worldVisitNotify),
+    pets: sanitizePets(o.pets),
   };
 }
 
@@ -90,7 +95,7 @@ export function savePrefs(storage: StorageLike | null, prefs: UiPrefs): void {
 
 /** Parte das preferências que o mundo (canvas) consome. */
 export function worldOptionsFrom(p: UiPrefs): Partial<WorldOptions> {
-  return { showNames: p.showNames, bubbles: p.bubbles, liveliness: p.liveliness, dayNight: p.daylight !== 'day', daylight: p.daylight, theme: p.theme };
+  return { showNames: p.showNames, bubbles: p.bubbles, liveliness: p.liveliness, dayNight: p.daylight !== 'day', daylight: p.daylight, theme: p.theme, pets: p.pets };
 }
 
 /** localStorage com proteção contra navegadores que lançam exceção ao acessá-lo. */

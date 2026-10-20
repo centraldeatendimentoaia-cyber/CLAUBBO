@@ -293,7 +293,7 @@ function parasolSprite(seed: number): PropSprite {
   return { canvas: c, ax: 16, ay: 29 };
 }
 
-/** Totem da entrada com a marca (azul-marinho e laranja, como a placa da recepção). */
+/** Totem da entrada com as iniciais "Cb" (azul-marinho e laranja, como a placa da recepção). */
 function totemSprite(): PropSprite {
   const [c, ctx] = makeCanvas(14, 34);
   shadowEllipse(ctx, 7, 32, 6, 1.5, 0.25);
@@ -303,13 +303,13 @@ function totemSprite(): PropSprite {
   ctx.fillRect(3, 3, 8, 28);
   ctx.fillStyle = '#2a355a';
   ctx.fillRect(3, 3, 1, 28);
-  // faixa laranja no topo, "H" claro e "b" laranja (as cores de "Hab" e "blaud" na placa)
+  // faixa laranja no topo, "C" claro e "b" laranja (as iniciais "Cb" de Claubbo)
   ctx.fillStyle = '#f2a33a';
   ctx.fillRect(3, 5, 8, 2);
   ctx.fillStyle = '#f5f1e6';
   ctx.fillRect(4, 11, 1, 6);
-  ctx.fillRect(8, 11, 1, 6);
-  ctx.fillRect(5, 13, 3, 1);
+  ctx.fillRect(5, 11, 4, 1);
+  ctx.fillRect(5, 16, 4, 1);
   ctx.fillStyle = '#f2a33a';
   ctx.fillRect(5, 19, 1, 6);
   ctx.fillRect(6, 21, 2, 1);

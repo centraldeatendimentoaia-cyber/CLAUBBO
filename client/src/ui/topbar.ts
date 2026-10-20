@@ -8,7 +8,7 @@ import { FALLBACK_MARK, ICONS } from './icons';
 import { computeCounters, shellLine, shellWaitIn, shellWaitingAgents, waitingAgents, type Counters } from './model';
 import { TIMELAPSE_ICONS } from './timelapse';
 import { focusPermission, nextPermissionAgent, permissionAgents } from './permission';
-import { getFloor, onFloor, setFloor } from '../floor';
+import { toggleBuilding } from '../world/building-view';
 import { Builder } from './builder';
 import { Ops } from './ops';
 import { UsageCards } from './usage';
@@ -19,13 +19,11 @@ const ops = new Ops();
 /** Pasta de trabalho (Escritório v2). */
 const OPS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>';
 
-/** Alterna entre o andar 1 (agentes do Escritório) e o 2 (sessões do Claude Code em terminais). */
+/** Abre o prédio por fora para escolher o andar (a fachada e a câmera de elevador ficam em world/building-view.ts). */
 function floorButton(): HTMLButtonElement {
-  const label = () => (getFloor() === 1 ? 'Andar 1' : 'Andar 2');
-  const b = h('button', { class: 'ui-icon-btn ui-btn-floor', type: 'button', text: label(), on: { click: () => setFloor(getFloor() === 1 ? 2 : 1) } });
-  const title = () => (getFloor() === 1 ? 'Andar 1: agentes do Escritório. Clique para ver o andar 2 (terminais do Claude Code)' : 'Andar 2: terminais do Claude Code. Clique para voltar ao andar 1 (Escritório)');
-  b.title = title();
-  onFloor(() => { b.textContent = label(); b.title = title(); });
+  const b = h('button', { class: 'ui-icon-btn ui-btn-floor', type: 'button', text: 'Andar', on: { click: () => toggleBuilding() } });
+  b.title = 'Prédio: escolha o andar (↑ ↓ trocam, Esc fecha)';
+  b.setAttribute('aria-haspopup', 'dialog');
   return b;
 }
 /** Martelo e prédio (Escritório v2). */

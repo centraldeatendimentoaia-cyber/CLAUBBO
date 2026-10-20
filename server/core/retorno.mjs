@@ -1,8 +1,11 @@
 // Retorno automático: quando um agente de terminal termina um pedido que um agente do Escritório mandou (ex.: Maestro Dev),
 // a resposta final volta sozinha ao remetente como nova mensagem e o acorda (novo turno). Respostas longas vão como resumo +
-// caminho do arquivo com o texto completo. Cada entrega fica em data/cli-retorno-log.jsonl e há um teto de despertares por noite
-// (V2_RETORNO_LIMITE, padrão 20; "noite" = das 06:00 às 06:00) para impedir laço infinito. O teto é contado a partir do próprio
-// log, então reiniciar o app não zera. Só variável de ambiente muda o teto: nenhum agente edita isso.
+// caminho do arquivo com o texto completo. Cada entrega fica em data/cli-retorno-log.jsonl. Para impedir laço infinito e
+// custo sem fim há dois limites de despertares, contados POR AGENTE (um agente que acorda muito não gasta a vez dos outros):
+//  - rajada: no máximo 5 em 10 minutos (V2_RETORNO_RAJADA); é o freio contra repetição (pedir, receber, pedir de novo);
+//  - noite: no máximo 100 (V2_RETORNO_LIMITE; "noite" = das 06:00 às 06:00), teto de custo.
+// Acima de um limite o retorno é entregue ao histórico mas não acorda ninguém, e o log diz qual limite barrou e para quem.
+// Os limites são contados a partir do próprio log, então reiniciar o app não zera. Só variável de ambiente os muda.
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.mjs';
@@ -13,7 +16,10 @@ const INLINE_CHARS = 3000; // até aqui a resposta vai inteira na mensagem
 const SUMMARY_CHARS = 1200;
 const IDLE_POLLS = 2; // o terminal precisa ser visto ocioso em verificações seguidas (evita pegar pausa entre ferramentas)
 
-export const limitPerNight = () => { const n = Number(process.env.V2_RETORNO_LIMITE); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 20; };
+const envInt = (name, def) => { const n = Number(process.env[name]); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : def; };
+export const limitPerNight = () => envInt('V2_RETORNO_LIMITE', 100);
+export const limitBurst = () => envInt('V2_RETORNO_RAJADA', 5);
+export const BURST_MS = 10 * 60_000;
 const pad = (n) => String(n).padStart(2, '0');
 export const nightKey = (ms) => { const d = new Date(ms - 6 * 3600_000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const logFile = () => path.join(config.data, 'cli-retorno-log.jsonl');
@@ -22,9 +28,24 @@ export const filesDir = () => path.join(config.data, 'run', 'respostas');
 export function readLog() {
   try { return fs.readFileSync(logFile(), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
 }
-export function wakesTonight(nowMs) {
+/** Despertares da noite atual; com `para`, só os desse agente. */
+export function wakesTonight(nowMs, para) {
   const k = nightKey(nowMs);
-  return readLog().filter((e) => e.acordou && nightKey(Date.parse(e.at)) === k).length;
+  return readLog().filter((e) => e.acordou && (para === undefined || e.para === para) && nightKey(Date.parse(e.at)) === k).length;
+}
+/** Despertares desse agente nos últimos `janelaMs` (padrão 10 min). */
+export function wakesRecent(nowMs, para, janelaMs = BURST_MS) {
+  return readLog().filter((e) => { const t = Date.parse(e.at); return e.acordou && e.para === para && t > nowMs - janelaMs && t <= nowMs; }).length;
+}
+/**
+ * Pode acordar `para` agora? { wake: true } ou { wake: false, limite: 'noite' | 'rajada', max, motivo }.
+ * `limites` ({ noite, rajada }) só existe para teste; o padrão vem das variáveis de ambiente. Valor 0 bloqueia tudo.
+ */
+export function wakeDecision(para, nowMs, limites = {}) {
+  const noite = limites.noite ?? limitPerNight(), rajada = limites.rajada ?? limitBurst();
+  if (wakesTonight(nowMs, para) >= noite) return { wake: false, limite: 'noite', max: noite, motivo: `limite de ${noite} despertares por noite atingido para ${para}` };
+  if (wakesRecent(nowMs, para) >= rajada) return { wake: false, limite: 'rajada', max: rajada, motivo: `limite de ${rajada} despertares em ${BURST_MS / 60_000} min atingido para ${para} (freio contra repetição)` };
+  return { wake: true };
 }
 function logReturn(entry) {
   fs.mkdirSync(path.dirname(logFile()), { recursive: true });
@@ -66,7 +87,7 @@ let running = false;
  *  requests: lista (cliRequests); agents: agentes de terminal do snapshot; read(sessionId, desde, ate) -> lastReplySince;
  *  deliver(to, text, meta, wake) -> entrega ao remetente; save(); now() em ms.
  */
-export async function tick({ requests, agents, read, deliver, save, now = Date.now }) {
+export async function tick({ requests, agents, read, deliver, save, now = Date.now, limites }) {
   if (running) return; running = true;
   try {
     const waiting = requests.filter((r) => r.retorno === 'aguardando').sort((a, b) => a.sentAt - b.sentAt);
@@ -82,13 +103,13 @@ export async function tick({ requests, agents, read, deliver, save, now = Date.n
       if (!r.ok || !r.texto || !r.concluido) continue;
       const text = redact(r.texto).text;
       const file = text.length > INLINE_CHARS ? saveFull(item, text) : '';
-      const wake = wakesTonight(now()) < limitPerNight();
-      const res = deliver(item.from, buildMessage({ item, text, file }), { pedidoId: item.id, agente: item.agentName }, wake);
+      const d = wakeDecision(item.from, now(), limites), wake = d.wake;
+      const res = deliver(item.from, buildMessage({ item, text, file }), { pedidoId: item.id, agente: item.agentName, ...(wake ? {} : { motivo: d.motivo }) }, wake);
       idleSeen.delete(item.id);
       item.retorno = res.ok ? (wake ? 'entregue' : 'entregue_sem_acordar') : 'falhou';
       item.retornoAt = now(); save();
       logReturn({ pedidoId: item.id, de: item.agentName, para: item.from, chars: text.length, ...(file ? { arquivo: file } : {}), acordou: !!(res.ok && wake), resultado: item.retorno,
-        ...(!wake ? { motivo: `limite de ${limitPerNight()} despertares por noite atingido` } : {}) });
+        ...(!wake ? { limite: d.limite, max: d.max, motivo: d.motivo } : {}) });
     }
   } finally { running = false; }
 }

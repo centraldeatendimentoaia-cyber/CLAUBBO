@@ -34,7 +34,8 @@ beforeAll(async () => {
   meetings = await import('./meetings.mjs');
   for (const id of ['ana', 'bia']) agents.createAgent({ id, name: id, model: 'sonnet', effort: 'low', account: 'principal' });
 });
-afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+// Uma fala cancelada ainda pode estar gravando na pasta quando o teste acaba (EPERM no Windows): tenta de novo em vez de derrubar o arquivo.
+afterAll(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
 
 describe('cancelar reunião', () => {
   it('durante a rodada: para de falar, fica "cancelled" no arquivo e a fala em curso é descartada', async () => {

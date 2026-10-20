@@ -16,6 +16,9 @@ async function loadChat(): Promise<ChatApi> {
 
 describe('histórico do chat: nada se perde no teto de 200', () => {
   it('as mais antigas vão para o arquivo morto; o histórico completo tem todas, sem repetir, em ordem; sobrevive a reinício', async () => {
+    // Cada pushMessage grava o JSON com fsync (store.mjs): 205 fsyncs levavam ~2 s num disco livre e estouravam os 20 s com o disco ocupado.
+    // Durabilidade em disco não é o que este teste confere (é o teto de 200 e o arquivo morto), então o fsync vira no-op aqui.
+    vi.spyOn(fs, 'fsyncSync').mockImplementation(() => {});
     let chat = await loadChat();
     let clock = 1_700_000_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => clock++);

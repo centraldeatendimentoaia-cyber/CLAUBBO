@@ -34,7 +34,7 @@ beforeAll(async () => {
   ctx = await import('./meeting-context.mjs');
   for (const id of ['ana', 'bia', 'caio']) agents.createAgent({ id, name: id.toUpperCase(), model: 'sonnet', effort: 'low', account: 'principal' });
 });
-afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+afterAll(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
 
 describe('ata como contexto dos participantes', () => {
   it('cada participante recebe a ata uma única vez, na próxima mensagem/tarefa', async () => {

@@ -20,6 +20,8 @@ import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
+import { PET_FRAMES, PET_FRAME_MS, petSprite } from '../../art/pets';
+import type { Pet } from '../pets/pets';
 import { countBadge, fallbackIcon } from './shell-sprites';
 import { decorateElevator, drawSeasonalLights, drawSeasonalWindow, seasonalCostume, seasonalFurniture } from './seasonal';
 import { buildAreaVis, furnitureSprites, opaqueBounds, paintShell, toWallVis, WALL_MARGIN, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
@@ -30,12 +32,13 @@ const enum K {
   Char,
   Prop,
   Car,
+  Pet,
 }
 
 interface Ent {
   k: K;
   y: number;
-  ref: FurnVis | Character | ExteriorProp | Car | null;
+  ref: FurnVis | Character | ExteriorProp | Car | Pet | null;
   area: AreaVis | null;
   scale: number;
 }
@@ -464,6 +467,7 @@ export class Renderer {
       }
     }
     for (const car of this.cars) if (visible(car.x - 24, car.y - 24, 48, 28)) push(K.Car, car.y, car, null, 1);
+    for (const pet of this.sim.pets.list) if (pet.placed && visible(pet.x - 16, pet.y - 24, 32, 32)) push(K.Pet, pet.depth(), pet, null, 1);
     ents.sort((a, b) => a.y - b.y || a.k - b.k);
 
     this.iconCount = 0;
@@ -483,6 +487,9 @@ export class Renderer {
           break;
         case K.Car:
           this.drawCar(e.ref as Car);
+          break;
+        case K.Pet:
+          this.drawPet(e.ref as Pet);
           break;
       }
     }
@@ -819,6 +826,34 @@ export class Renderer {
       ctx.fillRect(sx, sy, 1, 2);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /** Pet: mesma ordem de profundidade dos personagens; sombra no chão e, se pulando, o corpo sobe. */
+  private drawPet(p: Pet): void {
+    const { ctx } = this;
+    const x = Math.round(p.x);
+    const y = Math.round(p.y);
+    const sh = shadowSprite();
+    ctx.drawImage(sh.canvas, x - sh.ax, y - sh.ay);
+    const frames = PET_FRAMES[p.pose];
+    const frame = Math.floor(p.animT / PET_FRAME_MS[p.pose]) % frames;
+    let sprite: Sprite | null = null;
+    try {
+      sprite = petSprite({ species: p.setting.species, variant: p.variant, dir: p.dir, pose: p.pose, frame });
+    } catch {
+      sprite = null;
+    }
+    if (!sprite) return;
+    const lift = Math.round(p.lift);
+    ctx.drawImage(sprite.canvas, x - sprite.ax, y - sprite.ay - lift);
+    if (p.emote) {
+      // coraçãozinho ou "!" (pixel art de 5x5) sobe um pouco acima do pet
+      const ex = x - 2;
+      const ey = y - sprite.ay - lift - 7;
+      ctx.fillStyle = p.emote === 'heart' ? '#ff6b8a' : '#ffd36b';
+      const rows = p.emote === 'heart' ? ['.#.#.', '#####', '#####', '.###.', '..#..'] : ['..#..', '..#..', '..#..', '.....', '..#..'];
+      rows.forEach((row, j) => [...row].forEach((c, i) => c === '#' && ctx.fillRect(ex + i, ey + j, 1, 1)));
+    }
   }
 
   private drawCharacter(ch: Character, now: number, sel: { agent: string | null; hover: string | null }): void {

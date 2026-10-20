@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { buildThirdPartyNotices } from './scripts/third-party-licenses.mjs';
 
 const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
-// A licença MIT do Habblaud, os avisos e a licença OFL da fonte acompanham o build (dist/client/LICENSE, NOTICE.md e licenses/).
+// A licença MIT do Habblaud, os avisos, a licença OFL da fonte e os avisos de terceiros acompanham o build (dist/client/LICENSE, NOTICE.md, licenses/ e THIRD-PARTY-LICENSES.txt).
 const licenseFiles = () => ({
   name: 'claubbo-license-files',
   generateBundle(this: { emitFile: (f: { type: 'asset'; fileName: string; source: string }) => void }) {
@@ -14,6 +15,9 @@ const licenseFiles = () => ({
       ['licenses/OFL-Pixelify-Sans.txt', './node_modules/@fontsource/pixelify-sans/LICENSE'],
     ];
     for (const [fileName, from] of files) this.emitFile({ type: 'asset', fileName, source: readFileSync(r(from), 'utf8') });
+    const notices = buildThirdPartyNotices(r('.'));
+    if (notices.missing.length) throw new Error(`THIRD-PARTY-LICENSES.txt: pacotes sem pasta em node_modules (rode npm install): ${notices.missing.join(', ')}`);
+    this.emitFile({ type: 'asset', fileName: 'THIRD-PARTY-LICENSES.txt', source: notices.text });
   },
 });
 

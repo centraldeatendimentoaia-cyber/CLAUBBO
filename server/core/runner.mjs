@@ -17,6 +17,7 @@ import { budgetLeft, recordCost } from './costs.mjs';
 const MODELS = new Set(['sonnet', 'opus', 'fable', 'haiku']);
 const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 const SAFE_ARG = /^[\w.:/-]{1,64}$/;
+const SAFE_ID = /^[a-z0-9-]{1,60}$/;
 /** Ferramentas do próprio Claude Code que os agentes pensadores nunca recebem. */
 const BUILTIN_DENY = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Read', 'Glob', 'Grep', 'Agent', 'Task'];
 /** Escritas conhecidas do MCP do Meta Ads (em qualquer servidor cujo nome comece com "meta-ads"): bloqueadas por padrão (data/tool-rules.json acrescenta ou tira). */
@@ -95,10 +96,10 @@ export function toolsFor(agent, servers, rules = readJson(path.join(config.data,
 /**
  * Arquivo temporário só com os servidores MCP do agente, tirados da configuração de usuário do Claude Code. Com
  * `--strict-mcp-config` o Claude carrega apenas esses (rápido e sem as corridas de conexão de todos os outros). O arquivo leva
- * as variáveis de ambiente dos servidores, então fica em pasta temporária e é apagado ao fim da execução. Devolve null
+ * as variáveis de ambiente dos servidores (podem ter chaves), então fica em data/run/mcp/ (fora do git e do backup, nunca em %TEMP%) e é apagado ao fim da execução. Devolve null
  * quando algum servidor do agente não está nesse arquivo (conectores da conta, como Notion): aí o Claude carrega tudo.
  */
-function mcpSubset(names, agentId) {
+export function mcpSubset(names, agentId) {
   const user = readJson(path.join(config.home, '.claude.json'), {}).mcpServers || {};
   const pick = {};
   for (const n of names) {
@@ -106,7 +107,9 @@ function mcpSubset(names, agentId) {
     // o cli-agents precisa saber quem está pedindo (propor_agente, chamar_agente)
     pick[n] = n === 'cli-agents' ? { ...user[n], env: { ...user[n].env, AGENT_ID: agentId || '' } } : user[n];
   }
-  const file = path.join(os.tmpdir(), `v2-mcp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`);
+  const dir = path.join(config.data, 'run', 'mcp');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `v2-mcp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`);
   fs.writeFileSync(file, JSON.stringify({ mcpServers: pick }), { mode: 0o600 });
   return file;
 }
@@ -208,6 +211,15 @@ async function runCodex({ agent, system, prompt, env, cwd, signal, timeoutMs, im
   const args = ['exec', ...(images || []).flatMap((i) => ['-i', i.path]), '--skip-git-repo-check', '--ephemeral', '-s', 'read-only', '-C', cwd, '-o', outFile];
   if (agent.model && SAFE_ARG.test(agent.model) && !MODELS.has(agent.model)) args.push('-m', agent.model);
   if (EFFORTS.has(agent.effort)) args.push('-c', `model_reasoning_effort="${agent.effort === 'xhigh' || agent.effort === 'max' ? 'high' : agent.effort}"`);
+  if (Array.isArray(agent.tools) && agent.tools.includes('cli-agents')) {
+    // O Codex lê MCP do config.toml; aqui o servidor sobe só para este turno, com o id do agente. Cada ferramenta que
+    // cria algo ainda espera o clique do João na página; a aprovação do Codex é só para o exec não travar sem ninguém.
+    const mcp = path.join(config.root, 'server', 'mcp-cli-agents.mjs');
+    const bridge = process.env.BRIDGE_URL || 'http://127.0.0.1:4530';
+    args.push('-c', 'mcp_servers.cli-agents.command="node"', '-c', `mcp_servers.cli-agents.args=['${mcp}']`,
+      '-c', `mcp_servers.cli-agents.env={BRIDGE_URL="${bridge}",AGENT_ID="${SAFE_ID.test(agent.id || '') ? agent.id : 'agente'}"}`,
+      '-c', 'mcp_servers.cli-agents.default_tools_approval_mode="approve"');
+  }
   args.push('-');
   const text = (system ? `${system}\n\n---\n\n` : '') + prompt;
   try {

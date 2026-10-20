@@ -302,7 +302,9 @@ export class Builder {
 
   private key(ev: KeyboardEvent): void {
     const t = ev.target as HTMLElement | null;
-    const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
+    // Só campo de digitar bloqueia os atalhos: o seletor de cor (e checkbox, slider) fica com o foco depois do uso e não aproveita R, V, Delete nem Ctrl+Z.
+    const inputType = ((t as HTMLInputElement | null)?.type ?? 'text').toLowerCase();
+    const typing = !!t && (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !['color', 'checkbox', 'radio', 'range', 'button'].includes(inputType)));
     if (ev.key === 'Escape') {
       ev.stopPropagation();
       if (this.tool) {

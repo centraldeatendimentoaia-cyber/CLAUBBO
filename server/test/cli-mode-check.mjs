@@ -35,14 +35,16 @@ await new Promise((r) => hab.listen(HAB_PORT, '127.0.0.1', r));
 fs.mkdirSync(path.join(tmp, '.claude', 'projects', 'p'), { recursive: true });
 fs.writeFileSync(path.join(tmp, '.claude', '.credentials.json'), '{}');
 const startBridge = () => spawn(process.execPath, [path.join(here, '..', 'bridge.mjs')], {
-  env: { ...process.env, BRIDGE_PORT: String(PORT), CLAUBBO_URL: `http://127.0.0.1:${HAB_PORT}`, V2_DATA: path.join(tmp, 'data'), V2_HOME: tmp, V2_BRAIN: path.join(tmp, 'brain'), V2_OLD_DATA: path.join(tmp, 'nada'), V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]) },
+  env: { ...process.env, BRIDGE_PORT: String(PORT), CLAUBBO_URL: `http://127.0.0.1:${HAB_PORT}`, V2_DATA: path.join(tmp, 'data'), V2_HOME: tmp, V2_BRAIN: path.join(tmp, 'brain'), V2_OLD_DATA: path.join(tmp, 'nada'), V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' }, // sem janela do Windows no teste
   stdio: 'ignore',
 });
 let child = startBridge();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const waitBridge = async () => { for (let i = 0; i < 40; i++) { const r = await call('/api/cli/agents').catch(() => null); if (r?.body.agents?.length) return; await sleep(300); } };
 const call = async (p, opts = {}) => { const r = await fetch(BASE + p, opts); return { status: r.status, body: await r.json().catch(() => ({})) }; };
-const post = (p, body, origin) => call(p, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) }, body: JSON.stringify(body) });
+// tokens da instalação (data/acesso.json): a página manda o seu junto com o Origin; sem Origin quem fala é um agente (servidor MCP)
+const tok = (k) => { try { return JSON.parse(fs.readFileSync(path.join(tmp, 'data', 'acesso.json'), 'utf8'))[k]; } catch { return ''; } };
+const post = (p, body, origin) => call(p, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { origin, 'x-v2-token': tok('pagina') } : { 'x-v2-agente': tok('agentes') }) }, body: JSON.stringify(body) });
 const ask = (text) => post('/api/cli/requests', { agentId: 'x:1', text, from: 'maestro-dev' });
 try {
   for (let i = 0; i < 40; i++) { // espera a bridge subir e enxergar o terminal falso
@@ -111,7 +113,7 @@ try {
   assert.equal((await ask('rode os testes')).body.estado, 'esperando_aprovacao');
   for (const x of (await call('/api/cli/requests')).body.requests.filter((q) => q.state === 'pending')) await post(`/api/cli/requests/${x.id}/reject`, {}, BASE);
   // 7) retorno automático pela bridge real: pedido aprovado -> terminal responde e fica ocioso -> a resposta chega ao remetente e o acorda
-  assert.equal((await post('/api/ops/agents', { id: 'maestro-dev', name: 'Maestro Dev', role: 'Chefe' })).status, 201);
+  assert.equal((await post('/api/ops/agents', { id: 'maestro-dev', name: 'Maestro Dev', role: 'Chefe' }, BASE)).status, 201);
   r = await post('/api/cli/requests', { agentId: 'x:1', text: 'rode os testes', from: 'maestro-dev' });
   assert.equal(r.body.estado, 'esperando_aprovacao');
   const pid = r.body.pedidoId;

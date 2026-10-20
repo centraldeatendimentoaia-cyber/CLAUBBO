@@ -362,7 +362,27 @@ export class Overlay {
     }
     this.drawChats(now);
     this.drawFloaters(now);
+    if (showAll) this.drawPetNames();
     ctx.textBaseline = 'alphabetic';
+  }
+
+  /** Nome de cada pet à vista (só com "Mostrar nomes" ligado e zoom que dá para ler). */
+  private drawPetNames(): void {
+    const { ctx } = this;
+    ctx.font = LABEL_FONT;
+    ctx.textAlign = 'center';
+    for (const p of this.sim.pets.list) {
+      if (!p.placed) continue;
+      const x = this.sx(p.x);
+      const y = this.sy(p.y + 3);
+      if (x < -60 || y < -20 || x > this.camera.viewW + 60 || y > this.camera.viewH + 20) continue;
+      const w = ctx.measureText(p.setting.name).width + 8;
+      ctx.fillStyle = 'rgba(20,22,32,0.72)';
+      ctx.fillRect(Math.round(x - w / 2), Math.round(y), Math.round(w), 13);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(p.setting.name, Math.round(x), Math.round(y) + 7);
+    }
+    ctx.textAlign = 'start';
   }
 
   /** Quem senta virado para a câmera atrás de uma mesa: a etiqueta nos pés cobriria a tela do colega. */

@@ -3,9 +3,10 @@
 import * as artModule from '../art';
 import { TILE, type ArtModule } from '../art/api';
 import type { OfficeStore } from '../net/store';
-import { onFloor } from '../floor';
+import { getFloor, onFloor, setFloor } from '../floor';
 import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type Selection, type SocialEvent, type SoundCue, type WorldApi, type WorldOptions, type WorldPlayback } from './api';
 import { loadWorldAssets, type WorldAssets } from './assets';
+import { createBuildingView, onToggleBuilding } from './building-view';
 import { Camera, overviewFrame } from './camera';
 import { createDebug, type WorldDebug } from './debug';
 import { BUILDING_H, COL_W } from './constants';
@@ -56,9 +57,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const visitMode = !!o.visit;
   const camera = new Camera();
   // Simulação e desenho são recriados quando o timelapse entra, pula ou sai (rebuild).
-  let sim = new Sim(art, () => options, undefined, { visit: visitMode });
-  let renderer = new Renderer(canvas, art, sim, camera);
-  let overlay = new Overlay(renderer.ctx, sim, renderer, camera);
+  let sim!: Sim;
+  let renderer!: Renderer;
+  let overlay!: Overlay;
   let assets: WorldAssets | null = null;
   /** Timelapse ligado: relógio próprio do mundo (`worldNow`), acelerado pelo fator de animação. */
   let playback: WorldPlayback | null = null;
@@ -68,7 +69,43 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const socialCbs = new Set<(e: SocialEvent) => void>();
   const soundCbs = new Set<(c: SoundCue) => void>();
   const roomMenuCbs = new Set<(roomId: string, at: { x: number; y: number }) => void>();
-  let cues = new SoundCues(sim, camera);
+  let cues!: SoundCues;
+  // Uma simulação por andar, todas rodando: trocar de andar só troca qual é desenhada (os agentes do outro andar seguem
+  // onde estão, sem sair nem entrar). Na visita há um só, sem fixar o andar.
+  interface Layer {
+    floor: number;
+    sim: Sim;
+    renderer: Renderer;
+    overlay: Overlay;
+    cues: SoundCues;
+  }
+  const makeLayer = (floor: number): Layer => {
+    // só a simulação do andar 1 guarda as carteiras no navegador (as duas gravariam na mesma chave)
+    const s = new Sim(art, () => options, playback || (!visitMode && floor !== 1) ? null : undefined, visitMode ? { visit: true } : { floor });
+    const r = new Renderer(canvas, art, s, camera);
+    if (assets) r.setAssets(assets);
+    if (playback) {
+      const p = playback;
+      r.clock = () => p.clock();
+    }
+    return { floor, sim: s, renderer: r, overlay: new Overlay(r.ctx, s, r, camera), cues: new SoundCues(s, camera) };
+  };
+  const layers = new Map<number, Layer>();
+  let activeFloor = visitMode ? 1 : getFloor();
+  const buildLayers = () => {
+    layers.clear();
+    for (const f of visitMode ? [1] : [1, 2]) layers.set(f, makeLayer(f));
+  };
+  const useLayer = (floor: number) => {
+    const l = layers.get(floor) ?? layers.get(1)!;
+    activeFloor = l.floor;
+    sim = l.sim;
+    renderer = l.renderer;
+    overlay = l.overlay;
+    cues = l.cues;
+  };
+  buildLayers();
+  useLayer(activeFloor);
   let selection: Selection = null;
   let hover: string | null = null;
   let mouse: { x: number; y: number } | null = null;
@@ -81,7 +118,28 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   let userMoved = false;
   let framed = false;
   let lastCols = -1;
+  /** Sala enquadrada pela última vez (a fachada começa nela) e sala a enquadrar quando a troca de andar terminar de montar. */
+  let viewRoom: string | null = null;
+  let pendingRoom: { id: string; until: number } | null = null;
   const abort = new AbortController();
+
+  // Prédio por fora: o botão "Andar" abre a fachada; na chegada ao andar, o mundo troca de andar e enquadra a sala.
+  const building = visitMode
+    ? null
+    : createBuildingView(canvas, {
+        data: () => (store.snapshot ? { rooms: store.snapshot.rooms, agents: store.snapshot.agents } : null),
+        where: () => ({ worldFloor: getFloor(), roomId: viewRoom }),
+        arrive: (t) => {
+          setFloor(t.world);
+          if (t.roomId) pendingRoom = { id: t.roomId, until: Date.now() + 6000 };
+          else {
+            pendingRoom = null;
+            userMoved = false;
+            overview(false);
+          }
+        },
+      });
+  const offBuilding = building ? onToggleBuilding(() => !suspended && building.toggle()) : () => {};
 
   // ------------------------------------------------------------------ tamanho/DPR
 
@@ -122,6 +180,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
 
   const overview = (animate = true) => {
     camera.follow = null;
+    viewRoom = null;
     const o = overviewTarget();
     if (animate) camera.animateTo(o.x, o.y, o.zoom, Date.now(), 420);
     else {
@@ -165,6 +224,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     const room = sim.rooms.get(id);
     if (!room) return;
     userMoved = true;
+    viewRoom = id;
     camera.follow = null;
     const r = room.layout.rect;
     const rect = { x: r.x * TILE, y: r.y * TILE - 8, w: r.w * TILE, h: r.h * TILE + 16 };
@@ -252,14 +312,25 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     if (!snap) return;
     try {
       // No timelapse, os horários do snapshot vão para o relógio do mundo (world/playback.ts).
-      if (playback) sim.applySnapshot(rebaseSnapshot(snap, worldNow - snap.serverTime), worldNow);
-      else sim.applySnapshot(snap, Date.now());
+      const input = playback ? rebaseSnapshot(snap, worldNow - snap.serverTime) : snap;
+      for (const l of layers.values()) l.sim.applySnapshot(input, playback ? worldNow : Date.now());
     } catch (err) {
       console.error('[mundo] snapshot inválido ignorado', err);
     }
   };
   const offSnapshot = store.on('snapshot', onSnapshot);
-  const offFloor = onFloor(onSnapshot);
+  /** Troca de andar: só muda qual simulação é desenhada e a câmera reenquadra. Nenhum agente é tocado. */
+  const showFloor = () => {
+    const floor = visitMode ? 1 : getFloor();
+    if (floor === activeFloor || !layers.has(floor)) return;
+    useLayer(floor);
+    debug = createDebug(sim, renderer, camera, markMoved);
+    camera.follow = null;
+    lastCols = -1;
+    userMoved = false;
+    setHover(null);
+  };
+  const offFloor = onFloor(showFloor);
   if (store.snapshot) onSnapshot();
 
   void loadWorldAssets(abort.signal).then((a) => {
@@ -287,6 +358,11 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
       if (canvas.clientWidth !== camera.viewW || canvas.clientHeight !== camera.viewH || dpr !== camera.dpr) resize();
       sim.update(dt, now);
+      for (const l of layers.values()) {
+        if (l.sim === sim) continue;
+        l.sim.update(dt, now);
+        l.sim.social.events.length = 0;
+      }
       // partidas e apostas resolvidas: para o feed (as do timelapse são encenação do passado: ficam fora)
       const events = sim.social.events;
       if (events.length) {
@@ -294,6 +370,13 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
         events.length = 0;
       }
       renderer.sync(seasonalThemeFor(options.theme, new Date()));
+      if (pendingRoom) {
+        if (sim.rooms.get(pendingRoom.id)?.present) {
+          const id = pendingRoom.id;
+          pendingRoom = null;
+          focusRoom(id);
+        } else if (Date.now() > pendingRoom.until) pendingRoom = null;
+      }
       if (sim.building.cols !== lastCols) {
         lastCols = sim.building.cols;
         updateBounds();
@@ -331,7 +414,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       return;
     }
     lastTs = 0;
-    if (hiddenAt && Date.now() - hiddenAt > 5000) sim.fastForward(playback ? worldNow : Date.now());
+    if (hiddenAt && Date.now() - hiddenAt > 5000) for (const l of layers.values()) l.sim.fastForward(playback ? worldNow : Date.now());
     hiddenAt = 0;
   };
 
@@ -373,16 +456,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const rebuild = () => {
     // As carteiras ao vivo gravam a cada 5 s: não perde o que mudou desde a última vez (no replay, não grava nada).
     sim.social.wallets.save(Date.now());
-    sim = new Sim(art, () => options, playback ? null : undefined, { visit: visitMode });
-    renderer = new Renderer(canvas, art, sim, camera);
-    if (assets) renderer.setAssets(assets);
-    if (playback) {
-      const p = playback;
-      renderer.clock = () => p.clock();
-    }
-    overlay = new Overlay(renderer.ctx, sim, renderer, camera);
+    buildLayers();
+    useLayer(activeFloor);
     debug = createDebug(sim, renderer, camera, markMoved);
-    cues = new SoundCues(sim, camera);
     lastCols = -1;
     setHover(null);
   };
@@ -461,7 +537,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
         return;
       }
       lastTs = 0;
-      if (suspendedAt && Date.now() - suspendedAt > 5000) sim.fastForward(playback ? worldNow : Date.now());
+      if (suspendedAt && Date.now() - suspendedAt > 5000) for (const l of layers.values()) l.sim.fastForward(playback ? worldNow : Date.now());
       suspendedAt = 0;
       hiddenAt = 0;
       raf = requestAnimationFrame(loop);
@@ -471,6 +547,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       abort.abort();
       offSnapshot();
       offFloor();
+      offBuilding();
+      building?.destroy();
       detachInput();
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('contextmenu', onContextMenu);

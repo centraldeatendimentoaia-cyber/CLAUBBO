@@ -12,11 +12,18 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+import fs from 'node:fs';
+import nodePath from 'node:path';
+import { config } from './core/config.mjs';
+
 const BRIDGE = process.env.BRIDGE_URL || 'http://127.0.0.1:4530';
 const FROM = process.env.AGENT_ID || 'agente';
 
+// Token dos agentes (data/acesso.json): só vale para criar pedidos e propostas, que esperam o clique do João. Relido a cada chamada.
+const agentToken = () => { try { return JSON.parse(fs.readFileSync(nodePath.join(config.data, 'acesso.json'), 'utf8')).agentes || ''; } catch { return ''; } };
+
 async function bridge(path, opts) {
-  const r = await fetch(BRIDGE + path, { ...opts, headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8000) });
+  const r = await fetch(BRIDGE + path, { ...opts, headers: { 'content-type': 'application/json', 'x-v2-agente': agentToken() }, signal: AbortSignal.timeout(8000) });
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(body.error || `erro ${r.status}`);
   return body;

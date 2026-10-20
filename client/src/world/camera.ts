@@ -33,6 +33,26 @@ export function overviewFrame(
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+/** Pose de câmera da fachada do prédio (centro em px da fachada + zoom); `cabin` é a altura da cabine do elevador. */
+export interface CamPose {
+  cx: number;
+  cy: number;
+  z: number;
+  cabin?: number;
+}
+
+/**
+ * Câmera de elevador: interpola de `from` a `to` (t de 0 a 1, suavizado). `dip` afasta o zoom no meio do trajeto
+ * (o arco que mostra a fachada passando entre andares); a cabine acompanha. Puro.
+ */
+export function elevatorFrame<T extends CamPose>(from: T, to: T, t: number, dip = 0): T {
+  const k = ease(Math.max(0, Math.min(1, t)));
+  const l = (a: number, b: number) => a + (b - a) * k;
+  const out = { ...to, cx: l(from.cx, to.cx), cy: l(from.cy, to.cy), z: l(from.z, to.z) - dip * Math.sin(Math.PI * Math.max(0, Math.min(1, t))) };
+  if (from.cabin !== undefined && to.cabin !== undefined) out.cabin = l(from.cabin, to.cabin);
+  return out;
+}
+
 export class Camera {
   x = 0;
   y = 0;

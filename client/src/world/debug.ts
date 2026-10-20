@@ -188,6 +188,7 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
         light: Math.round(r.light(now()) * 100) / 100,
         occupants: sim.occupants(r),
       })),
+      pets: sim.pets.list.map((p) => ({ id: p.id, name: p.setting.name, species: p.setting.species, tile: [p.tx, p.ty], pose: p.pose, dir: p.dir, mode: p.mode, emote: p.emote, tutor: p.tutorId, visita: p.claim ? (p.claim.kind ?? 'a caminho') : null })),
       chars: [...sim.chars.values()].map((c) => ({
         id: c.id,
         name: c.info.name,
