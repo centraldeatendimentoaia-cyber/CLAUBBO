@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountInfo } from '../../../shared/types';
-import { cardState, codexUsageNote, showsUsageAge, sourceLabel, usageMessage, usageSubtitle } from './usage';
+import { cardState, codexUsageNote, showsUsageAge, sourceLabel, USAGE_SETUP_STEPS, usageMessage, usageSubtitle } from './usage';
 
 const MIN = 60_000;
 type Acc = Pick<AccountInfo, 'usage' | 'usageStatus' | 'provider' | 'email' | 'plan' | 'configDir'>;
@@ -48,5 +48,14 @@ describe('cartão de uso de uma conta do Codex', () => {
     expect(usageSubtitle({ email: 'a@b.c', configDir: '~/.claude' })).toBe('a@b.c');
     expect(usageSubtitle({ configDir: '~/.claude' })).toBe('~/.claude');
     expect(codexUsageNote({ usageStatus: 'ok' }, 0)).toBe('');
+  });
+});
+
+describe('USAGE_SETUP_STEPS', () => {
+  it('/reload-plugins vale só para o Claude Code; no Codex, sessão nova', () => {
+    const [cmd, text] = USAGE_SETUP_STEPS[0];
+    expect(cmd).toBe('npm run mod:install');
+    expect(text).toContain('nas sessões do Claude Code já abertas, `/reload-plugins`');
+    expect(text).toContain('o Codex não tem esse comando: abra uma sessão nova');
   });
 });

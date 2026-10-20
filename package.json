@@ -19,7 +19,10 @@
     "dev:client": "vite --config vite.config.ts",
     "check": "node server/build-shared.mjs && node server/test/core-check.mjs && node server/test/transcript-check.mjs && node server/test/cli-mode-check.mjs && node server/test/retorno-check.mjs && vitest run",
     "test": "vitest run",
-    "visual": "node server/test/visual-check.mjs"
+    "visual": "node server/test/visual-check.mjs",
+    "mod:install": "node scripts/mod.mjs install",
+    "mod:status": "node scripts/mod.mjs status",
+    "mod:uninstall": "node scripts/mod.mjs uninstall"
   },
   "devDependencies": {
     "@fontsource/pixelify-sans": "^5.3.0",

@@ -144,11 +144,9 @@ export class AboutGroup {
         { class: 'ui-set__hint' },
         tr('Para atualizar, na pasta do Claubbo: '),
         h('code', { class: 'ui-usage-setup__cmd', text: 'git pull' }),
-        tr(' e de novo '),
-        h('code', { class: 'ui-usage-setup__cmd', text: 'npm run docker:up' }),
-        tr(' (sem Docker: '),
+        tr(' e depois '),
         h('code', { class: 'ui-usage-setup__cmd', text: 'npm run build && npm start' }),
-        ').',
+        '.',
       ),
     );
     this.repo = h('a', { class: 'ui-link-btn', text: tr('Código no GitHub'), attrs: { target: '_blank', rel: 'noopener noreferrer' } });

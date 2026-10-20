@@ -1,5 +1,5 @@
 // Aviso de versão nova: quando o servidor passa a servir outro build do cliente (ex.: depois de um
-// `npm run docker:up`), esta página está desatualizada — ela não conhece estados e recursos novos.
+// `npm run build && npm start`), esta página está desatualizada — ela não conhece estados e recursos novos.
 // Mostra o aviso e recarrega sozinha em alguns segundos (dá para adiar).
 import type { OfficeStore } from '../net/store';
 import { h, setHidden, setText } from './dom';

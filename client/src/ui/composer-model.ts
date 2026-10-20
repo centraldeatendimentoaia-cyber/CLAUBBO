@@ -1,15 +1,15 @@
 // Caixa de mensagem (ui/composer.ts), parte pura e testada em ui/composer-model.test.ts: quando a caixa aparece (e
 // por que não), o que a tecla Enter faz, a linha de situação de cada envio e o ritmo da consulta da entrega.
 // No Codex a mensagem entra na fila da sessão (`codex queue`) e vira prompt quando ela fica ociosa: "Entregue" diz
-// isso; sem quem entregue (no Docker, o auxiliar do host), a dica é a do `npm run codex:bridge`.
+// isso; sem quem entregue, a dica diz que esta instalação não traz o entregador (não há script para instalá-lo).
 import { MESSAGE_MAX } from '../../../shared/messages';
 import type { AgentInfo, OutboxStatus, Provider } from '../../../shared/types';
 import { tr } from '../../../shared/i18n';
 
 /** Dica para quem tem o recurso ligado, mas a sessão do agente não está com o plugin conectado. */
 export const PLUGIN_HINT = tr('Para mandar mensagens daqui: npm run mod:install (plugin habblaud-mensagens)');
-/** A mesma dica para um agente do Codex sem entregador (no modo Node o próprio servidor entrega). */
-export const CODEX_BRIDGE_HINT = tr('Para mandar mensagens ao Codex: com o Claubbo no Docker, deixe npm run codex:bridge rodando; no modo Node funciona sozinho');
+/** A dica para um agente do Codex sem entregador. */
+export const CODEX_BRIDGE_HINT = tr('Mensagens ao Codex indisponíveis: esta instalação não traz o entregador de mensagens do Codex');
 
 /**
  * - ready: dá para mandar (principal com o plugin conectado, recurso ligado, página local);

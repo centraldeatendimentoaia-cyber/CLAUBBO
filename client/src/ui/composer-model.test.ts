@@ -101,11 +101,11 @@ describe('caixa de mensagem (peças puras)', () => {
     expect(['sending', 'queued', 'sent'].some((p) => isSettled(p as never))).toBe(false);
   });
 
-  it('Codex: com entregador, igual ao Claude Code; sem ele, a dica do codex:bridge; recurso desligado manda ao Codex', () => {
+  it('Codex: com entregador, igual ao Claude Code; sem ele, a dica de entregador ausente; recurso desligado manda ao Codex', () => {
     const codex = (over: Partial<AgentInfo> = {}) => agent({ provider: 'codex', ...over });
     expect(composerMode(codex(), ON)).toEqual({ kind: 'ready' });
     expect(composerMode(codex({ canMessage: undefined }), ON)).toEqual({ kind: 'hint', text: CODEX_BRIDGE_HINT });
-    expect(CODEX_BRIDGE_HINT).toBe('Para mandar mensagens ao Codex: com o Claubbo no Docker, deixe npm run codex:bridge rodando; no modo Node funciona sozinho');
+    expect(CODEX_BRIDGE_HINT).toBe('Mensagens ao Codex indisponíveis: esta instalação não traz o entregador de mensagens do Codex');
     expect(composerMode(codex(), { ...ON, enabled: false })).toEqual({ kind: 'off', text: 'Para responder, use o Codex' });
     expect(composerMode(codex({ kind: 'sub', parentId: 'acc:1' }), ON).kind).toBe('off');
     expect(composerMode(codex({ status: 'offline' }), ON)).toEqual({ kind: 'off', text: 'Sessão encerrada' });

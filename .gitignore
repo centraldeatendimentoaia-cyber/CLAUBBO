@@ -8,3 +8,4 @@ assets-novos/
 JMAL/
 .env*
 *.log
+.vitest/
