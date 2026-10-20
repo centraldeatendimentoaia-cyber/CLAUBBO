@@ -11296,7 +11296,12 @@ details.op-card > summary { cursor: pointer; display: flex; gap: 8px; align-item
 .op-chip { width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: #0b1020; }
 .op-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .op-check { display: flex; gap: 6px; align-items: center; font-size: 13px; }
-.op-row { display: flex; gap: 8px; margin-top: 8px; }
+.op-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+/* Reuniões: botões dentro do cartão aberto ganham respiro e área de clique */
+details.op-card > .bd-btn, .op-copy, .op-summary { margin-top: 10px; }
+.op-copy { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.op-summary .op-list { margin: 4px 0 8px; padding-left: 20px; font-size: 13px; line-height: 1.5; }
+.op-row select { width: auto; max-width: 180px; }
 .op textarea, .op input[type='text'], .op select { background: var(--ui-bg-soft); color: var(--ui-text); border: 1px solid var(--ui-line-strong); border-radius: var(--radius-sm); padding: 7px 9px; font-family: inherit; font-size: 13px; width: 100%; box-sizing: border-box; }
 .op-banner { max-width: 860px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
 .op-banner[hidden] { display: none; }

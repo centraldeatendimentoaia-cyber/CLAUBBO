@@ -46,7 +46,17 @@ export class Ops {
   private skipped = false;
   /** Botão do mouse apertado dentro da janela: não redesenha por cima até soltar (o clique não se perde). */
   private pressing = false;
-  private release = () => { this.pressing = false; if (this.skipped && this.root && this.editing === null) { this.skipped = false; this.render(); } };
+  // O `click` chega depois do `pointerup`: redesenhar aqui trocava o botão sob o mouse e o clique se perdia. Adia para depois do clique.
+  private release = () => {
+    this.pressing = false;
+    window.setTimeout(() => {
+      if (this.skipped && this.root && !this.pressing && this.editing === null && !this.root.querySelector('textarea:focus, input:focus, select:focus')) { this.skipped = false; this.render(); }
+    }, 0);
+  };
+  /** Reuniões que o usuário abriu: sobrevivem ao redesenho da lista. */
+  private openMeetings = new Set<string>();
+  /** Último corpo recebido de /api/ops/state: comparar o texto evita refazer JSON.parse e stringify (~160 KB) a cada 3 s. */
+  private lastRaw = '';
   /** Formulário aberto (agente em edição, ou novo): enquanto existe, a lista não é redesenhada por cima. */
   private editing: Agent | 'new' | null = null;
   private drafts: Record<string, string> = {};
@@ -63,6 +73,7 @@ export class Ops {
     if (this.root) return;
     if (tab) this.tab = tab;
     this.root = el('div', 'op');
+    this.lastRaw = ''; // a janela reaberta precisa desenhar mesmo que os dados sejam os mesmos
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-label', 'Operações do escritório');
     this.tabsEl = el('div', 'bd-tabs op-tabs');
@@ -72,6 +83,7 @@ export class Ops {
     this.body = el('div', 'op-body');
     const head = el('div', 'op-head');
     head.append(el('h2', 'bd-title', 'Operações'), this.tabsEl, btn('Fechar (Esc)', () => this.close()));
+    this.body.append(el('p', 'op-muted', 'Carregando…'));
     this.root.append(head, this.banner, this.msg, this.body);
     (document.querySelector('.ui-root') ?? document.body).append(this.root);
     window.addEventListener('keydown', this.onKey, true);
@@ -109,15 +121,20 @@ export class Ops {
   }
 
   private async load(): Promise<void> {
+    if (this.st && document.hidden) return; // aba escondida: não consulta o servidor à toa
     let next: OpsState;
+    let raw: string;
     try {
-      next = (await (await fetch('/api/ops/state')).json()) as OpsState;
+      const res = await fetch('/api/ops/state');
+      raw = await res.text();
+      next = JSON.parse(raw) as OpsState;
     } catch {
       return this.say('Não consegui falar com o servidor do escritório.', true);
     }
     const before = this.st;
-    const unchanged = !!before && JSON.stringify(before) === JSON.stringify(next);
-    this.st = next;
+    const unchanged = !!before && raw === this.lastRaw;
+    this.lastRaw = raw;
+    if (!unchanged) this.st = next;
     this.watchLogins(before);
     this.renderBanner();
     // não redesenha por cima de um formulário aberto ou de um campo em uso
@@ -474,7 +491,8 @@ export class Ops {
     for (const m of st.meetings) {
       const names = m.participants.map((id) => st.agents.find((a) => a.id === id)?.name ?? id).join(', ');
       const det = h('details', { class: 'op-card' });
-      det.open = m.state === 'running';
+      det.open = m.state === 'running' || this.openMeetings.has(m.id);
+      det.addEventListener('toggle', () => { if (det.open) this.openMeetings.add(m.id); else this.openMeetings.delete(m.id); });
       det.append(h('summary', {}, h('strong', { text: m.objective }), h('span', { class: `op-badge op-badge--${m.state === 'done' ? 'done' : m.state === 'running' ? 'doing' : m.state === 'interrupted' ? 'bad' : 'next'}`, text: STATE_LABEL[m.state] ?? m.state }), h('span', { class: 'op-muted', text: ` ${names} · ${m.turns.length}/${m.participants.length * m.rounds} falas` })));
       for (const t of m.turns) det.append(h('p', { class: 'op-turn' }, h('strong', { text: `${t.name} (rodada ${t.round}): ` }), h('span', { text: t.text })));
       if (m.minutes) det.append(el('h3', 'bd-group', `Ata${m.note ? ` (Reunioes/${m.note})` : ''}`), h('pre', { class: 'op-pre', text: m.minutes }));

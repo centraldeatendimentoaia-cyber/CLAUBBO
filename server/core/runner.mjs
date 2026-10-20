@@ -47,11 +47,15 @@ let mcpRefresh = null;
 export async function listMcpServers(force = false) {
   const fresh = Date.now() - mcpCache.at < 60_000;
   if (!force && fresh) return mcpCache.servers;
-  if (!force && mcpCache.servers.length) {
+  // `at` também vale quando a lista veio vazia (claude sem servidores ou falhou): sem isso cada consulta de 3 s esperava até 40 s
+  if (!force && mcpCache.at) {
     mcpRefresh ??= fetchMcp().finally(() => { mcpRefresh = null; });
     return mcpCache.servers;
   }
-  return fetchMcp();
+  // primeira chamada: quem chegar junto espera a mesma execução, em vez de abrir um `claude mcp list` por consulta
+  if (force) return fetchMcp();
+  mcpRefresh ??= fetchMcp().finally(() => { mcpRefresh = null; });
+  return mcpRefresh;
 }
 
 async function fetchMcp() {
@@ -68,7 +72,7 @@ async function fetchMcp() {
     const m = /^(.+?):\s+(\S.*?)\s+-\s+(.*)$/.exec(line.trim());
     if (m) servers.push({ name: m[1], id: toolId(m[1]), key: norm(m[1]), status: /connected|conectad/i.test(m[3]) && !/fail|need|auth/i.test(m[3]) ? 'connected' : 'unavailable' });
   }
-  if (servers.length) mcpCache = { at: Date.now(), servers };
+  mcpCache = { at: Date.now(), servers: servers.length ? servers : mcpCache.servers }; // falha mantém a lista anterior
   return mcpCache.servers;
 }
 
