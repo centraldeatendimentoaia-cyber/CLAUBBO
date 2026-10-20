@@ -9,7 +9,6 @@ const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z
 process.env.V2_DATA = path.join(tmp, 'data');
 process.env.V2_HOME = tmp;
 process.env.V2_BRAIN = path.join(tmp, 'brain');
-process.env.V2_OLD_DATA = path.join(tmp, 'nada');
 fs.mkdirSync(path.join(tmp, '.claude'), { recursive: true });
 fs.writeFileSync(path.join(tmp, '.claude', '.credentials.json'), '{}'); // conta "conectada" de mentira (conteúdo nunca é lido)
 process.env.V2_CLAUDE_BIN = process.execPath;

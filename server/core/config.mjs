@@ -9,7 +9,7 @@ const env = process.env;
 export const config = {
   root: ROOT,
   data: env.V2_DATA || path.join(ROOT, 'data'),
-  brain: env.V2_BRAIN || 'D:/escritorio/brain', // barras normais: funcionam no Windows e não dependem de escape
+  brain: env.V2_BRAIN || path.join(env.V2_DATA || path.join(ROOT, 'data'), 'brain'),
   home: env.V2_HOME || os.homedir(),
   /** Segredos (token do Telegram): pasta FORA do projeto, nunca em data/. */
   secrets: env.V2_SECRETS || path.join(env.APPDATA || os.homedir(), 'escritorio-v2'),

@@ -13,13 +13,12 @@ import { config } from './core/config.mjs';
 import { createAccount, dirOf, listAccounts, openClaudeTerminal, removeAccount, startLogin } from './core/accounts.mjs';
 import { recentActivity } from './core/activity.mjs';
 import { normalize as normalizeAgent, createAgent, deleteAgent, getAgent, loadAgents, updateAgent } from './core/agents.mjs';
-import { listSkills, migrateBrainFolder, systemFor } from './core/brain.mjs';
+import { listSkills, systemFor } from './core/brain.mjs';
 import { clearHistory, fullHistory, history, IMG_DIR, pushMessage, receiveReturn, sendMessage } from './core/chat.mjs';
 import { deliveriesFrom, loadSeen, markSeen } from './core/deliveries.mjs';
 import { activityEntries, chatEntries, dayKey, defaultTz, diffFeed, groupByDay, relabelCliEntries, relabelSseChunk } from './core/terminal-feed.mjs';
 import * as live from './core/live.mjs';
 import { cancelMeeting, createMeeting, decideMinutes, inMeeting, interruptRunning, listMeetings, MAX_PARTICIPANTS, stepToTask } from './core/meetings.mjs';
-import { migrateFromOld } from './core/migrate.mjs';
 import { listMcpServers, runTurn } from './core/runner.mjs';
 import { codexUsageOf, usageOf } from './core/usage.mjs';
 import { readJson, writeJson } from './core/store.mjs';
@@ -994,9 +993,6 @@ ${logs}` : ''}`;
 }
 
 export function start() {
-  for (const f of migrateFromOld()) console.log(`migrado do Escritório antigo: ${f}`);
-  const brainMove = migrateBrainFolder();
-  if (brainMove.moved || brainMove.kept) console.log(`cérebro: pasta "Agents Office" movida para "Escritorio de Agentes" (${brainMove.moved} movidos, ${brainMove.kept} mantidos na antiga por já existirem na nova)`);
   ensureRooms();
   for (const id of interruptRunning()) console.log(`reunião interrompida pelo reinício: ${id}`);
   listMcpServers().catch(() => {}); // aquece o cache: `claude mcp list` demora, e as telas e as tarefas dependem dele

@@ -30,7 +30,7 @@ async function startBridge(confirm: 'sim' | 'nao'): Promise<Bridge> {
   const port = await freePort(), dead = await freePort();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v2-acesso-http-'));
   const child = spawn(process.execPath, [path.join(here, '..', 'bridge.mjs')], {
-    env: { ...process.env, BRIDGE_PORT: String(port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: path.join(dir, 'data'), V2_HOME: dir, V2_BRAIN: path.join(dir, 'brain'), V2_OLD_DATA: path.join(dir, 'nada'), V2_SECRETS: path.join(dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: confirm },
+    env: { ...process.env, BRIDGE_PORT: String(port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: path.join(dir, 'data'), V2_HOME: dir, V2_BRAIN: path.join(dir, 'brain'), V2_SECRETS: path.join(dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: confirm },
     stdio: 'ignore',
   });
   const tok = (k: 'pagina' | 'agentes') => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', 'acesso.json'), 'utf8'))[k]; } catch { return ''; } };
@@ -180,7 +180,7 @@ describe('pasta do projeto e comando do sistema', () => {
 async function startBridgeOn(b: Bridge): Promise<Bridge> {
   const dead = await freePort();
   b.child = spawn(process.execPath, [path.join(here, '..', 'bridge.mjs')], {
-    env: { ...process.env, BRIDGE_PORT: String(b.port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: path.join(b.dir, 'data'), V2_HOME: b.dir, V2_BRAIN: path.join(b.dir, 'brain'), V2_OLD_DATA: path.join(b.dir, 'nada'), V2_SECRETS: path.join(b.dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' },
+    env: { ...process.env, BRIDGE_PORT: String(b.port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: path.join(b.dir, 'data'), V2_HOME: b.dir, V2_BRAIN: path.join(b.dir, 'brain'), V2_SECRETS: path.join(b.dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' },
     stdio: 'ignore',
   });
   for (let i = 0; i < 60; i++) { const r = await raw(b.port, 'GET', '/api/health', { host: `127.0.0.1:${b.port}` }).catch(() => null); if (r?.status === 200) return b; await sleep(250); }

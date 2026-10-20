@@ -31,7 +31,7 @@ beforeAll(async () => {
   port = await freePort(); const dead = await freePort();
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v2-seg-http-'));
   child = spawn(process.execPath, [path.join(here, '..', 'bridge.mjs')], {
-    env: { ...process.env, BRIDGE_PORT: String(port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: path.join(dir, 'data'), V2_HOME: dir, V2_BRAIN: path.join(dir, 'brain'), V2_OLD_DATA: path.join(dir, 'nada'), V2_SECRETS: path.join(dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' },
+    env: { ...process.env, BRIDGE_PORT: String(port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: path.join(dir, 'data'), V2_HOME: dir, V2_BRAIN: path.join(dir, 'brain'), V2_SECRETS: path.join(dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' },
     stdio: 'ignore',
   });
   for (let i = 0; i < 60; i++) { const r = await raw(port, 'GET', '/api/health').catch(() => null); if (r?.status === 200) return; await sleep(250); }

@@ -13,11 +13,10 @@ const RULES = [
   'Ferramentas bloqueadas ou sem permissão: diga qual foi bloqueada e siga com o que for possível.',
 ];
 
-/** Pasta do escritório dentro do cofre (skills, lições). A antiga "Agents Office" usava o nome de outro produto: migrateBrainFolder a move. */
+/** Pasta do escritório dentro do cofre (skills, lições). */
 export const BRAIN_DIR = 'Escritorio de Agentes';
-const OLD_BRAIN_DIR = 'Agents Office';
 
-const SKIP_DIR = new Set(['.obsidian', '.git', 'node_modules', 'Arquivo', 'chats', BRAIN_DIR, OLD_BRAIN_DIR]);
+const SKIP_DIR = new Set(['.obsidian', '.git', 'node_modules', 'Arquivo', 'chats', BRAIN_DIR]);
 const meta = (name) => path.join(config.brain, '00-Meta', name);
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const words = (s) => new Set(s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').match(/[a-z0-9]{4,}/g) || []);
@@ -91,36 +90,6 @@ export const skillsFor = (agent) => listSkills().filter((s) => (agent.skills || 
 
 // ---------------------------------------------------------------- lições
 const lessonFile = (id) => path.join(config.brain, BRAIN_DIR, 'feedback', `${id}.md`);
-
-/**
- * Traz o conteúdo da pasta antiga "Agents Office" para BRAIN_DIR, sem apagar nada: sem pasta nova, a antiga é renomeada;
- * com as duas, cada item que não existe na nova é movido e o que já existe lá fica na antiga (nunca sobrescreve).
- * A pasta antiga só some quando termina vazia. Devolve quantos itens foram movidos e quantos ficaram.
- */
-export function migrateBrainFolder() {
-  const from = path.join(config.brain, OLD_BRAIN_DIR);
-  const to = path.join(config.brain, BRAIN_DIR);
-  const out = { moved: 0, kept: 0 };
-  if (!fs.existsSync(from)) return out;
-  const merge = (src, dst) => {
-    fs.mkdirSync(dst, { recursive: true });
-    for (const name of fs.readdirSync(src)) {
-      const a = path.join(src, name), b = path.join(dst, name);
-      try {
-        if (!fs.existsSync(b)) { fs.renameSync(a, b); out.moved++; }
-        else if (fs.statSync(a).isDirectory() && fs.statSync(b).isDirectory()) merge(a, b);
-        else out.kept++;
-      } catch { out.kept++; }
-    }
-    try { fs.rmdirSync(src); } catch { /* ainda tem itens: fica */ }
-  };
-  if (!fs.existsSync(to)) {
-    try { fs.renameSync(from, to); out.moved = 1; listCache.at = 0; return out; } catch { /* sem permissão: cai no merge item a item */ }
-  }
-  merge(from, to);
-  listCache.at = 0;
-  return out;
-}
 
 /** Regras aprendidas com os "revise:" do dono: uma linha cada, só as marcadas [regra] entram no contexto. */
 export function lessonsFor(id, max = 10) {

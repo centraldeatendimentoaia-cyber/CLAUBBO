@@ -43,12 +43,12 @@ Regras:
 - `claude mcp add --scope user cli-agents -- node "<caminho absoluto>/server/mcp-cli-agents.mjs"`. Confira com `claude mcp list`.
 
 6. Suba o servidor
-- Defina `V2_BRAIN` para uma pasta `Claubbo-brain` dentro da minha pasta de usuário (o padrão aponta para `D:/escritorio/brain`, que não existe em outras máquinas) e crie a pasta. Depois rode `npm start` na raiz, em segundo plano, com essa variável.
+- Rode `npm start` na raiz, em segundo plano.
 - Confira se http://127.0.0.1:4530/api/health responde `ok`. Na primeira subida o servidor cria a pasta `data/` sozinho.
-- Não use o `abrir-escritorio.cmd` deste projeto: ele aponta para uma pasta de outra máquina. Se eu quiser um atalho, crie um que aponte para a pasta instalada e defina o `V2_BRAIN`.
+- No Windows, o `abrir-escritorio.cmd` da pasta instalada sobe o servidor e abre a página. Se eu quiser um atalho na área de trabalho, crie um que aponte para ele.
 
 7. Verifique e me entregue
 - Abra http://127.0.0.1:4530 no navegador. Confira que as salas aparecem e que, se o Docker estiver no ar, o andar 2 lista as sessões do Claude Code.
-- Me diga, em poucas linhas: o que foi instalado, o que ficou de fora e por quê, a URL do escritório e o comando para iniciar de novo (com o `V2_BRAIN`).
+- Me diga, em poucas linhas: o que foi instalado, o que ficou de fora e por quê, a URL do escritório e o comando para iniciar de novo.
 - Me lembre do último passo, que é meu: em *Operações > Contas*, conectar a conta Claude (e a do Codex, se eu usar). O login é feito por mim, nunca por você.
 ````

@@ -12,7 +12,7 @@ const home = path.join(tmp, 'home');
 fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
 fs.writeFileSync(path.join(home, '.claude', '.credentials.json'), '{}');
 Object.assign(process.env, {
-  V2_DATA: path.join(tmp, 'data'), V2_BRAIN: path.join(tmp, 'brain'), V2_HOME: home, V2_OLD_DATA: path.join(tmp, 'nada'),
+  V2_DATA: path.join(tmp, 'data'), V2_BRAIN: path.join(tmp, 'brain'), V2_HOME: home,
   V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONCURRENCY: '2', V2_RETORNO_LIMITE: '3',
 });
 const { createAgent, getAgent } = await import('../core/agents.mjs');

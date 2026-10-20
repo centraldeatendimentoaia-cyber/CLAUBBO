@@ -12,12 +12,12 @@ const home = path.join(tmp, 'home');
 fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
 fs.writeFileSync(path.join(home, '.claude', '.credentials.json'), '{}'); // conta principal "conectada" (conteúdo nunca é lido)
 Object.assign(process.env, {
-  V2_DATA: path.join(tmp, 'data'), V2_BRAIN: path.join(tmp, 'brain'), V2_HOME: home, V2_OLD_DATA: path.join(tmp, 'nada'),
+  V2_DATA: path.join(tmp, 'data'), V2_BRAIN: path.join(tmp, 'brain'), V2_HOME: home,
   V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]),
   V2_CODEX_BIN: process.execPath, V2_CODEX_PRE: JSON.stringify([path.join(here, 'fake-codex.mjs')]), V2_CONCURRENCY: '2',
 });
-fs.mkdirSync(path.join(tmp, 'brain', 'Agents Office', 'skills', 'pesquisa'), { recursive: true });
-fs.writeFileSync(path.join(tmp, 'brain', 'Agents Office', 'skills', 'pesquisa', 'SKILL.md'), '---\nname: pesquisa\ndescription: como pesquisar\nagents: [ana]\n---\nPesquise antes de escrever.\n');
+fs.mkdirSync(path.join(tmp, 'brain', 'Escritorio de Agentes', 'skills', 'pesquisa'), { recursive: true });
+fs.writeFileSync(path.join(tmp, 'brain', 'Escritorio de Agentes', 'skills', 'pesquisa', 'SKILL.md'), '---\nname: pesquisa\ndescription: como pesquisar\nagents: [ana]\n---\nPesquise antes de escrever.\n');
 fs.writeFileSync(path.join(tmp, 'brain', 'CLAUDE.md'), 'Salão de beleza em Natal.');
 
 const { createAgent, getAgent, updateAgent } = await import('../core/agents.mjs');
@@ -26,10 +26,7 @@ const { history, sendMessage } = await import('../core/chat.mjs');
 const { createTask, listTasks } = await import('../core/tasks.mjs');
 const { createMeeting, getMeeting, stepToTask } = await import('../core/meetings.mjs');
 const { listMcpServers, toolsFor } = await import('../core/runner.mjs');
-const { BRAIN_DIR, migrateBrainFolder, systemFor } = await import('../core/brain.mjs');
-// a pasta antiga "Agents Office" do cofre é movida para a nova sem perder a skill
-assert.deepEqual(migrateBrainFolder(), { moved: 1, kept: 0 });
-assert.ok(!fs.existsSync(path.join(tmp, 'brain', 'Agents Office')));
+const { BRAIN_DIR, systemFor } = await import('../core/brain.mjs');
 assert.ok(fs.existsSync(path.join(tmp, 'brain', BRAIN_DIR, 'skills', 'pesquisa', 'SKILL.md')));
 const live = await import('../core/live.mjs');
 

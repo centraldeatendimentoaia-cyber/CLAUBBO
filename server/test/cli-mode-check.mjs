@@ -35,7 +35,7 @@ await new Promise((r) => hab.listen(HAB_PORT, '127.0.0.1', r));
 fs.mkdirSync(path.join(tmp, '.claude', 'projects', 'p'), { recursive: true });
 fs.writeFileSync(path.join(tmp, '.claude', '.credentials.json'), '{}');
 const startBridge = () => spawn(process.execPath, [path.join(here, '..', 'bridge.mjs')], {
-  env: { ...process.env, BRIDGE_PORT: String(PORT), CLAUBBO_URL: `http://127.0.0.1:${HAB_PORT}`, V2_DATA: path.join(tmp, 'data'), V2_HOME: tmp, V2_BRAIN: path.join(tmp, 'brain'), V2_OLD_DATA: path.join(tmp, 'nada'), V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' }, // sem janela do Windows no teste
+  env: { ...process.env, BRIDGE_PORT: String(PORT), CLAUBBO_URL: `http://127.0.0.1:${HAB_PORT}`, V2_DATA: path.join(tmp, 'data'), V2_HOME: tmp, V2_BRAIN: path.join(tmp, 'brain'), V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'sim' }, // sem janela do Windows no teste
   stdio: 'ignore',
 });
 let child = startBridge();
