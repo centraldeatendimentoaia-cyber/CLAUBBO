@@ -13,7 +13,7 @@ npm run check     # núcleo (Claude e Codex falsos) + testes do cliente
 
 Precisa de Node 22+ e do `claude` (e, para Codex, do `codex`) no PATH. Os dados ficam em `data/` (agentes, salas, tarefas, reuniões, conversas) e o cérebro (notas Obsidian) em `D:\escritorio\brain` (variável `V2_BRAIN`). Na primeira vez, agentes, contas e conversas do Escritório antigo são copiados (`V2_OLD_DATA`), sem alterar o antigo.
 
-Opcional, para uso ao vivo e mensagens pelo escritório: `npm run mod:install` (confere com `npm run mod:status`, desfaz com `npm run mod:uninstall`). Registra o marketplace `habblaud` e instala os plugins `habblaud`, `habblaud-permissoes` e `habblaud-mensagens` (Claude Code 2.1.287+, escopo user, via `claude plugin`). Os plugins vêm do Habblaud, não deste repositório: por padrão `~/habblaud-mod`, ou outra pasta com `--origem <pasta>` / `HABBLAUD_MOD_DIR` (precisa de `.claude-plugin/marketplace.json` e `mod/`). `--sem-permissoes` e `--sem-mensagens` (só no install) deixam um plugin de fora. Plugins e marketplaces já existentes são mantidos; um marketplace `habblaud` com outra origem não é trocado.
+Opcional, para uso ao vivo e mensagens pelo escritório: `npm run mod:install` (confere com `npm run mod:status`, desfaz com `npm run mod:uninstall`). Registra o marketplace `habblaud` e instala os plugins `habblaud`, `habblaud-permissoes` e `habblaud-mensagens` (Claude Code 2.1.287+, escopo user, via `claude plugin`). Os plugins vêm do Habblaud, não deste repositório: por padrão `~/habblaud-mod` (o conteúdo do `mod/` e do `.claude-plugin/` de `habblaud/` serve de origem: `--origem habblaud`), ou outra pasta com `--origem <pasta>` / `HABBLAUD_MOD_DIR` (precisa de `.claude-plugin/marketplace.json` e `mod/`). `--sem-permissoes` e `--sem-mensagens` (só no install) deixam um plugin de fora. Plugins e marketplaces já existentes são mantidos; um marketplace `habblaud` com outra origem não é trocado.
 
 ## O que tem
 
@@ -21,7 +21,7 @@ Opcional, para uso ao vivo e mensagens pelo escritório: `npm run mod:install` (
 - **Construtor** (botão de prédio): estilo, piso, paredes e os móveis do catálogo; tipo da sala (trabalho ou reunião); modelos prontos.
 - **Operações** (botão de pasta): agentes (conta, modelo, esforço, ferramentas, skills), tarefas, reuniões sem limite fixo de participantes e contas Claude/Codex.
 - **Conversa** na gaveta de cada agente; `revise: ...` vira regra durável no cérebro.
-- **Andar 2**: sessões do Claude Code abertas em terminais (lidas pelo Habblaud em `CLAUBBO_URL`, padrão http://127.0.0.1:4747; serviço separado, em Docker (`npm run docker:up` na pasta do Habblaud) ou modo Node. Se ele não estiver no ar, a lista fica vazia e `/api/cli/agents` traz o campo `servico` com o aviso). Os agentes do escritório acionam esses terminais pelo MCP `server/mcp-cli-agents.mjs`; o envio só sai depois do clique em Aprovar.
+- **Andar 2**: sessões do Claude Code abertas em terminais (lidas pelo Habblaud em `CLAUBBO_URL`, padrão http://127.0.0.1:4747; serviço separado, em Docker (`npm run docker:up` na pasta `habblaud/` deste repositório) ou modo Node. Se ele não estiver no ar, a lista fica vazia e `/api/cli/agents` traz o campo `servico` com o aviso). Os agentes do escritório acionam esses terminais pelo MCP `server/mcp-cli-agents.mjs`; o envio só sai depois do clique em Aprovar.
 
 ## Segurança dos agentes
 

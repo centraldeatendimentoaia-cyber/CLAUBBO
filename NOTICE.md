@@ -7,3 +7,7 @@
 A fonte Pixelify Sans (`@fontsource/pixelify-sans`) vai embutida no cliente e é licenciada pela SIL Open Font License 1.1, © 2021 The Pixelify Sans Project Authors. O texto da licença acompanha o build em `licenses/OFL-Pixelify-Sans.txt`.
 
 O Habblaud World não é usado aqui: nenhum dado sai desta máquina.
+
+## Habblaud (pasta `habblaud/`)
+
+A pasta `habblaud/` contém o Habblaud, de Márcio Junior, distribuído sob a licença MIT (© 2026 Márcio Junior). O texto da licença está em `habblaud/LICENSE`.
