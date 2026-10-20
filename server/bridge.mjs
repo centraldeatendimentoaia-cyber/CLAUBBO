@@ -186,7 +186,8 @@ function buildOffice(now) {
   const work = list.filter((r) => r.kind !== 'meeting');
   const meetingRoom = list.find((r) => r.kind === 'meeting');
   const accounts = listAccounts();
-  const roomsOut = list.map((r, i) => ({ id: r.id, name: displayName(r.id, r.name), path: r.project || r.name, slot: i, seed: hash32(r.id), createdAt: STARTED, ...(r.build ? { build: r.build } : {}) }));
+  // Um andar por sala: a 1ª fica no andar 1 (pets e carteiras), as demais sobem a partir do 3; o 2 é dos terminais CLI (mergeFloor2).
+  const roomsOut = list.map((r, i) => ({ id: r.id, name: displayName(r.id, r.name), path: r.project || r.name, slot: i, floor: i === 0 ? 1 : i + 2, seed: hash32(r.id), createdAt: STARTED, ...(r.build ? { build: r.build } : {}) }));
   const ids = new Set(list.map((r) => r.id));
   const meetings = inMeeting();
   const waitingTasks = listTasks().filter((t) => t.state === 'waiting');

@@ -201,3 +201,19 @@ describe('fachada aberta com a barra do topo', () => {
     }
   });
 });
+
+describe('uma sala por andar do mundo', () => {
+  const own = [room('a', 'Alfa', 0, 1), room('b', 'Beta', 1, 3), room('c', 'Cliente', 2, 4), room('t', 'Terminal 1', 5, 2)];
+  const g = buildFloors(own, []);
+  it('cada sala aponta para o andar do mundo dela', () => {
+    expect(floorTarget(g[1])).toEqual({ world: 1, roomId: 'a' });
+    expect(floorTarget(g[2])).toEqual({ world: 3, roomId: 'b' });
+    expect(floorTarget(g[3])).toEqual({ world: 4, roomId: 'c' });
+    expect(floorTarget(g[4])).toEqual({ world: 2 });
+  });
+  it('currentFloorN acha o andar pela sala e, sem ela, pelo andar do mundo', () => {
+    expect(currentFloorN(g, 3, 'b')).toBe(3);
+    expect(currentFloorN(g, 4, 'a')).toBe(4); // sala de outro andar enquadrada antes da troca: vale o andar do mundo
+    expect(currentFloorN(g, 2, 'b')).toBe(5);
+  });
+});

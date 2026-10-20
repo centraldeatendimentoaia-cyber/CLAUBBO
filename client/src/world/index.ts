@@ -92,9 +92,22 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   };
   const layers = new Map<number, Layer>();
   let activeFloor = visitMode ? 1 : getFloor();
+  /** Andares que o snapshot pede: um por sala do Escritório, mais sempre o 1 e o 2 (terminais). Visita: só o 1. */
+  const wantedFloors = (): Set<number> => {
+    const out = new Set<number>(visitMode ? [1] : [1, 2]);
+    if (!visitMode) for (const r of store.snapshot?.rooms ?? []) out.add(r.floor ?? 1);
+    return out;
+  };
   const buildLayers = () => {
     layers.clear();
-    for (const f of visitMode ? [1] : [1, 2]) layers.set(f, makeLayer(f));
+    for (const f of wantedFloors()) layers.set(f, makeLayer(f));
+  };
+  /** Acompanha as salas: andar novo ganha simulação (monta já pronto), andar sem sala some. */
+  const syncLayers = () => {
+    const want = wantedFloors();
+    for (const f of want) if (!layers.has(f)) layers.set(f, makeLayer(f));
+    for (const f of [...layers.keys()]) if (!want.has(f)) layers.delete(f);
+    if (!layers.has(activeFloor)) setFloor(1);
   };
   const useLayer = (floor: number) => {
     const l = layers.get(floor) ?? layers.get(1)!;
@@ -313,6 +326,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     try {
       // No timelapse, os horários do snapshot vão para o relógio do mundo (world/playback.ts).
       const input = playback ? rebaseSnapshot(snap, worldNow - snap.serverTime) : snap;
+      syncLayers();
       for (const l of layers.values()) l.sim.applySnapshot(input, playback ? worldNow : Date.now());
     } catch (err) {
       console.error('[mundo] snapshot inválido ignorado', err);

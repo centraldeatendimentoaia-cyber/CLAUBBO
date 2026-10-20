@@ -111,3 +111,30 @@ describe('no mundo: ida e volta entre andares', () => {
     }
   });
 });
+
+describe('uma sala por andar', () => {
+  it('cada sala tem o próprio andar e o andar novo ganha simulação sozinho', () => {
+    vi.stubGlobal('document', Object.assign(new EventTarget(), { fonts: new EventTarget() }));
+    vi.stubGlobal('window', new EventTarget());
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+    const canvas = Object.assign(new EventTarget(), { clientWidth: 800, clientHeight: 600, width: 800, height: 600, style: {}, getContext: () => ({}) }) as unknown as HTMLCanvasElement;
+    const store = new OfficeStore();
+    const base = snap();
+    store.snapshot = { ...base, rooms: [room('esc', 0, 1), room('dev', 1, 3), room('cli', 2, 2)], agents: [agent('ana', 'esc'), agent('bia', 'cli'), agent('caio', 'dev')] };
+    setFloor(1);
+    const world = createWorld(canvas, store);
+    const ids = () => (world.debug.state() as { chars: { id: string }[] }).chars.map((c) => c.id);
+    try {
+      expect(ids()).toEqual(['ana']);
+      setFloor(3);
+      expect(ids()).toEqual(['caio']);
+      setFloor(2);
+      expect(ids()).toEqual(['bia']);
+    } finally {
+      world.destroy();
+      store.disconnect();
+    }
+  });
+});

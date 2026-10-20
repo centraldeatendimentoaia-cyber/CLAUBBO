@@ -12,6 +12,8 @@ export interface FloorSpec {
   kind: 'lobby' | 'room' | 'cli';
   /** Sala que o andar mostra (só `room`). */
   roomId?: string;
+  /** Andar do mundo onde a sala mora (o `floor` dela; 1 se não vier). Só `room`. */
+  world?: number;
   agents: number;
 }
 
@@ -31,20 +33,22 @@ export function buildFloors(rooms: readonly RoomInfo[], agents: readonly AgentIn
   const rs = rooms.filter((r) => (r.floor ?? 1) !== 2).sort((a, b) => a.slot - b.slot || a.id.localeCompare(b.id));
   const count = (id: string) => agents.filter((a) => a.roomId === id && a.kind === 'main').length;
   const out: FloorSpec[] = [{ n: 1, label: 'Térreo', kind: 'lobby', agents: 0 }];
-  rs.forEach((r, i) => out.push({ n: i + 2, label: r.name, kind: 'room', roomId: r.id, agents: count(r.id) }));
+  rs.forEach((r, i) => out.push({ n: i + 2, label: r.name, kind: 'room', roomId: r.id, world: r.floor ?? 1, agents: count(r.id) }));
   out.push({ n: rs.length + 2, label: 'Terminais CLI', kind: 'cli', agents: 0 });
   return out;
 }
 
-/** Andar de destino de um andar da fachada: o `floor` do mundo (1 = Escritório, 2 = terminais) e a sala a enquadrar. */
-export function floorTarget(f: FloorSpec): { world: 1 | 2; roomId?: string } {
-  return f.kind === 'cli' ? { world: 2 } : { world: 1, roomId: f.roomId };
+/** Andar de destino de um andar da fachada: o `floor` do mundo (2 = terminais, o da própria sala nos demais) e a sala a enquadrar. */
+export function floorTarget(f: FloorSpec): { world: number; roomId?: string } {
+  return f.kind === 'cli' ? { world: 2 } : f.kind === 'lobby' ? { world: 1 } : { world: f.world ?? 1, roomId: f.roomId };
 }
 
 /** Andar da fachada que corresponde ao que o mundo mostra agora. */
 export function currentFloorN(specs: readonly FloorSpec[], worldFloor: number, roomId: string | null): number {
   if (worldFloor === 2) return specs[specs.length - 1].n;
-  return specs.find((f) => f.kind === 'room' && f.roomId === roomId)?.n ?? 1;
+  if (roomId === null) return 1;
+  const here = specs.filter((f) => f.kind === 'room' && f.world === worldFloor);
+  return (here.find((f) => f.roomId === roomId) ?? here[0])?.n ?? 1;
 }
 
 /** ↑ sobe, ↓ desce, sem sair do prédio. */
@@ -424,7 +428,7 @@ export interface BuildingHost {
   /** O que o mundo mostra agora: andar (1/2) e sala enquadrada, se houver. */
   where(): { worldFloor: number; roomId: string | null };
   /** Troca de andar de verdade, já com a fachada cobrindo a tela. */
-  arrive(target: { world: 1 | 2; roomId?: string }): void;
+  arrive(target: { world: number; roomId?: string }): void;
 }
 
 export interface BuildingView {
