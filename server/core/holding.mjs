@@ -63,3 +63,14 @@ export function podeDecidir(pessoa, pending) {
 
 /** Itens que o lote pode aprovar. A lista vem sempre do servidor, nunca de ids enviados pelo cliente. */
 export const lotesSeguros = (pendencias) => pendencias.filter((p) => p.safe === true);
+
+/**
+ * Reconfere, logo antes de agir (e depois de cada await desde o gate), que o item continua pendente no MESMO estágio
+ * classificado e que a pessoa ainda pode decidi-lo. Fecha a janela em que o estágio muda (plan -> implement) durante a espera.
+ */
+export function confirmarAntesDeAgir({ pendingNow, pid, pessoa, estagio }) {
+  const item = pendingNow().find((x) => x.id === pid);
+  if (!item || (item.stage ?? null) !== (estagio ?? null)) return { ok: false, status: 409, error: 'o item mudou enquanto a decisão esperava; confira de novo' };
+  if (!podeDecidir(pessoa, item)) return { ok: false, status: 403, error: 'só o dono pode decidir isto' };
+  return { ok: true, item };
+}
