@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador } from './interacao-model';
+import { aposFalhaDeLigar, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador } from './interacao-model';
 
 const base = { model: 'sonnet', provider: 'claude', status: 'idle', ocioso: true, obrigadoPossivel: true };
 const por = (itens: ReturnType<typeof menuDoAgente>, acao: string) => itens.find((i) => i.acao === acao)!;
@@ -72,6 +72,10 @@ describe('menuDoElevador', () => {
     expect(m.map((i) => i.andar)).toEqual([1, 2]);
   });
 
+  it('andar sem nome mostra só Andar N', () => {
+    expect(menuDoElevador([{ andar: 4, nome: '', temElevador: true }], 1)[0].rotulo).toBe('Andar 4');
+  });
+
   it('sem nenhum andar com elevador: lista vazia e mensagem', () => {
     const m = menuDoElevador([{ andar: 1, nome: 'A', temElevador: false }], 1);
     expect(m).toEqual([]);
@@ -90,5 +94,39 @@ describe('mensagemDaFalha', () => {
   it('403 mostra o motivo do servidor; sem rede avisa', () => {
     expect(mensagemDaFalha('btw', 403, 'sem permissão')).toBe('sem permissão');
     expect(mensagemDaFalha('btw', 0, '')).toBe('Sem conexão com o servidor.');
+  });
+});
+
+describe('agradecer carregando', () => {
+  it('enquanto a lista não chegou, o motivo é carregando e não sem resultado novo', () => {
+    const a = por(menuDoAgente({ ...base, obrigadoPossivel: false, carregando: true }), 'agradecer');
+    expect(a.habilitado).toBe(false);
+    expect(a.motivo).toBe('carregando…');
+  });
+});
+
+describe('criarGuarda', () => {
+  it('ignora disparos enquanto uma chamada está em voo e libera depois', async () => {
+    const g = criarGuarda();
+    let solta!: (v: string) => void;
+    const primeira = g.rodar(() => new Promise<string>((r) => (solta = r)));
+    expect(g.ativo).toBe(true);
+    expect(await g.rodar(async () => 'segunda')).toEqual({ rodou: false });
+    solta('ok');
+    expect(await primeira).toEqual({ rodou: true, valor: 'ok' });
+    expect(g.ativo).toBe(false);
+    expect(await g.rodar(async () => 'terceira')).toEqual({ rodou: true, valor: 'terceira' });
+  });
+  it('libera mesmo se a chamada falhar', async () => {
+    const g = criarGuarda();
+    await expect(g.rodar(async () => { throw new Error('x'); })).rejects.toThrow('x');
+    expect(g.ativo).toBe(false);
+  });
+});
+
+describe('aposFalhaDeLigar', () => {
+  it('espera 30 s e desiste na terceira falha', () => {
+    expect(aposFalhaDeLigar(1, 1000)).toEqual({ desistiu: false, naoAntesDe: 31_000 });
+    expect(aposFalhaDeLigar(3, 1000).desistiu).toBe(true);
   });
 });

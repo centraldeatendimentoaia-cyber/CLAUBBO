@@ -8,7 +8,7 @@ import type { Alvo } from '../world/player';
 import type { PlayerWorld } from '../world/api';
 import type { UiContext } from './context';
 import { h } from './dom';
-import { MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
+import { aposFalhaDeLigar, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
 
 const BTW_MAX = 500;
 
@@ -27,7 +27,10 @@ export class Interacao {
   private alvo: Alvo | null = null;
   private vista: Vista = { tipo: 'menu' };
   private indice = 0;
-  private obrigados = new Set<string>();
+  /** null = /api/xp ainda não respondeu. */
+  private obrigados: Set<string> | null = null;
+  /** Uma chamada de rede por vez: troca de modelo, obrigado e btw. */
+  private readonly guarda = criarGuarda();
   private abriuPor: Element | null = null;
   private ligado = false;
 
@@ -41,6 +44,13 @@ export class Interacao {
     ctx.root.append(this.dica);
     window.addEventListener('keydown', (e) => this.teclaCaptura(e), { capture: true });
     window.addEventListener('keydown', (e) => this.teclaAbrir(e));
+    // Firefox dispara o click do botão no keyup do Espaço; o keydown já tratou a tecla, então o keyup não pode clicar de novo.
+    window.addEventListener('keyup', (e) => {
+      if (this.painel && e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, { capture: true });
     window.addEventListener('pointerdown', (e) => {
       if (this.painel && !this.painel.contains(e.target as Node)) this.fechar();
     });
@@ -52,29 +62,49 @@ export class Interacao {
   // ---------------------------------------------------------------- ligar o boneco
 
   private tentando = false;
+  private falhas = 0;
+  private desistiu = false;
+  private naoAntesDe = 0;
 
-  /** A aparência (`me`) vem do stream do mundo, a mesma fonte da cena Visita; o stream abre só para ler e fecha em seguida. */
+  /**
+   * A aparência (`me`) vem do stream do mundo, a mesma fonte da cena Visita; o stream abre só para ler e fecha em seguida.
+   * Falhou: espera 30 s antes de tentar de novo e, na terceira falha, desiste até recarregar a página (nunca conecta e fecha em laço).
+   */
   private tentarLigar(): void {
-    if (this.ligado || this.tentando || !this.ctx.store.snapshot || !this.disponivel()) return;
+    if (this.ligado || this.tentando || this.desistiu || Date.now() < this.naoAntesDe || !this.ctx.store.snapshot || !this.disponivel()) return;
     this.tentando = true;
-    void import('../net/world-stream').then((ws) => {
-      const stream = ws.createWorldStream({ mock: this.ctx.store.mock });
-      const limite = setTimeout(() => this.fimTentativa(stream, off), 20_000);
-      const off = stream.on((ev) => {
-        if (ev.type !== 'snapshot' || !ev.snapshot.me) return;
-        const { name, look, parts } = ev.snapshot.me;
-        clearTimeout(limite);
-        this.ligado = true;
-        this.player.ligar({ name, look, parts });
-        this.fimTentativa(stream, off);
-      });
-    });
-  }
-
-  private fimTentativa(stream: { close(): void }, off: () => void): void {
-    off();
-    stream.close();
-    this.tentando = false;
+    let acabou = false;
+    let off: () => void = () => {};
+    let stream: { close(): void } | null = null;
+    let limite: ReturnType<typeof setTimeout> | undefined;
+    const acabar = (ok: boolean): void => {
+      if (acabou) return;
+      acabou = true;
+      clearTimeout(limite);
+      off();
+      stream?.close();
+      this.tentando = false;
+      if (!ok) {
+        const p = aposFalhaDeLigar(++this.falhas, Date.now());
+        this.desistiu = p.desistiu;
+        this.naoAntesDe = p.naoAntesDe;
+      }
+    };
+    limite = setTimeout(() => acabar(false), 20_000);
+    void import('../net/world-stream')
+      .then((ws) => {
+        if (acabou) return;
+        const st = ws.createWorldStream({ mock: this.ctx.store.mock });
+        stream = st;
+        off = st.on((ev) => {
+          if (acabou || ev.type !== 'snapshot' || !ev.snapshot.me) return;
+          const { name, look, parts } = ev.snapshot.me;
+          this.ligado = true;
+          this.player.ligar({ name, look, parts });
+          acabar(true);
+        });
+      })
+      .catch(() => acabar(false));
   }
 
   // ---------------------------------------------------------------- dica e menu aberto: um laço por quadro
@@ -139,6 +169,10 @@ export class Interacao {
       return;
     }
     if (e.key === 'Tab') return;
+    if (e.repeat && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      return;
+    }
     if (this.vista.tipo === 'menu') {
       const itens = this.itens();
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -174,7 +208,7 @@ export class Interacao {
     this.vista = { tipo: 'menu' };
     this.indice = 0;
     this.abriuPor = document.activeElement;
-    this.obrigados = new Set();
+    this.obrigados = null;
     const painel = h('div', { class: 'int' });
     painel.style.left = `${Math.max(8, Math.min(Math.round(pos.x) + 24, innerWidth - 300))}px`;
     painel.style.top = `${Math.max(8, Math.min(Math.round(pos.y) - 24, innerHeight - 340))}px`;
@@ -205,18 +239,18 @@ export class Interacao {
     if (a.tipo === 'agente') {
       const ag = this.ctx.agent(a.id);
       if (!ag) return [];
-      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', obrigadoPossivel: this.obrigados.has(a.id) });
+      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null });
     }
     return menuDoElevador(this.andares(), getFloor());
   }
 
-  /** Os andares do prédio: um por sala, mais sempre o 1 e o 2 (terminais). Todos têm elevador. */
+  /** Os andares do prédio: um por sala, mais sempre o 1 e o 2 (terminais). O cliente não tem dado de quais andares têm elevador: todos entram como `temElevador` e `irParaAndar` é quem recusa. */
   private andares(): { andar: number; nome: string; temElevador: boolean }[] {
     const rooms = this.ctx.store.snapshot?.rooms ?? [];
     const andares = new Set<number>([1, 2, ...rooms.map((r) => r.floor ?? 1)]);
     return [...andares].sort((x, y) => x - y).map((andar) => {
       const nomes = rooms.filter((r) => (r.floor ?? 1) === andar).map((r) => r.name);
-      return { andar, nome: nomes.length ? nomes.slice(0, 2).join(', ') : andar === 2 ? 'Terminais' : 'Sem salas', temElevador: true };
+      return { andar, nome: nomes.length ? nomes.slice(0, 2).join(', ') : andar === 2 ? 'Terminais' : '', temElevador: true };
     });
   }
 
@@ -267,41 +301,55 @@ export class Interacao {
 
   // ---------------------------------------------------------------- ações com rede
 
-  private async agradecer(id: string): Promise<void> {
-    const r = await agradecer(id);
-    if (!this.painel) return;
-    if (r.ok) {
-      const xp = typeof r.corpo.xp === 'number' ? ` (${r.corpo.xp} XP)` : '';
-      this.obrigados.delete(id);
-      this.texto('Agradecer', `Obrigado enviado${xp}.`);
-    } else this.texto('Agradecer', mensagemDaFalha('agradecer', r.status, r.erro));
+  /** Uma chamada por vez: com outra em voo o disparo é ignorado (nada de segundo pedido nem de erro por cima do sucesso). */
+  private async emVoo(fn: () => Promise<void>): Promise<void> {
+    const feito = this.guarda.rodar(fn);
+    this.desenhar(); // mostra "Enviando…"
+    const r = await feito;
+    if (r.rodou && this.painel) this.desenhar(); // a guarda já foi solta
   }
 
-  private async trocar(id: string, direcao: 'subir' | 'descer', de: string): Promise<void> {
-    const r = await trocarModelo(id, direcao, de);
-    if (!this.painel) return;
-    if (r.ok) {
-      const para = typeof r.corpo.para === 'string' ? r.corpo.para : '';
-      this.ctx.invalidate();
-      this.texto('Modelo', `Modelo trocado: ${de} → ${para}.`);
-    } else {
-      if (r.status === 409) this.ctx.invalidate();
-      this.texto('Modelo', mensagemDaFalha(direcao, r.status, r.erro));
-    }
+  private agradecer(id: string): Promise<void> {
+    return this.emVoo(async () => {
+      const r = await agradecer(id);
+      if (!this.painel) return;
+      if (r.ok) {
+        const xp = typeof r.corpo.xp === 'number' ? ` (${r.corpo.xp} XP)` : '';
+        this.obrigados?.delete(id);
+        this.texto('Agradecer', `Obrigado enviado${xp}.`);
+      } else this.texto('Agradecer', mensagemDaFalha('agradecer', r.status, r.erro));
+    });
   }
 
-  private async enviarBtw(texto: string): Promise<void> {
+  private trocar(id: string, direcao: 'subir' | 'descer', de: string): Promise<void> {
+    return this.emVoo(async () => {
+      const r = await trocarModelo(id, direcao, de);
+      if (!this.painel) return;
+      if (r.ok) {
+        const para = typeof r.corpo.para === 'string' ? r.corpo.para : '';
+        this.ctx.invalidate();
+        this.texto('Modelo', `Modelo trocado: ${de} → ${para}.`);
+      } else {
+        if (r.status === 409) this.ctx.invalidate();
+        this.texto('Modelo', mensagemDaFalha(direcao, r.status, r.erro));
+      }
+    });
+  }
+
+  private enviarBtw(texto: string): Promise<void> {
     const a = this.alvo;
     const pergunta = texto.trim().slice(0, BTW_MAX);
-    if (!a || !pergunta || this.vista.tipo !== 'btw' || this.vista.enviando) return;
-    this.vista = { tipo: 'btw', resposta: 'Pensando…', enviando: true };
-    this.desenhar();
-    const r = await perguntarBtw(a.id, pergunta);
-    if (!this.painel || this.vista.tipo !== 'btw') return;
-    const resposta = r.ok ? (typeof r.corpo.resposta === 'string' ? r.corpo.resposta : '') : mensagemDaFalha('btw', r.status, r.erro);
-    this.vista = { tipo: 'btw', resposta, enviando: false };
-    this.desenhar();
-    this.ctx.announce(resposta);
+    if (!a || !pergunta || this.vista.tipo !== 'btw' || this.guarda.ativo) return Promise.resolve();
+    return this.emVoo(async () => {
+      this.vista = { tipo: 'btw', resposta: 'Pensando…', enviando: true };
+      this.desenhar();
+      const r = await perguntarBtw(a.id, pergunta);
+      if (!this.painel || this.vista.tipo !== 'btw') return;
+      const resposta = r.ok ? (typeof r.corpo.resposta === 'string' ? r.corpo.resposta : '') : mensagemDaFalha('btw', r.status, r.erro);
+      this.vista = { tipo: 'btw', resposta, enviando: false };
+      this.desenhar();
+      this.ctx.announce(resposta);
+    });
   }
 
   // ---------------------------------------------------------------- desenho
@@ -347,6 +395,7 @@ export class Interacao {
         lista.append(botao);
       });
       p.append(lista);
+      if (this.guarda.ativo) p.append(h('p', { class: 'int-resp', role: 'status', text: 'Enviando…' }));
       this.focarItem();
       return;
     }
@@ -365,7 +414,7 @@ export class Interacao {
       );
       if (!v.enviando) campo.focus({ preventScroll: true });
     } else if (v.tipo === 'confirmar') {
-      const ok = h('button', { class: 'int-btn int-btn--ok', type: 'button', text: 'Confirmar', on: { click: () => void this.trocar(a.id, v.direcao, v.de) } });
+      const ok = h('button', { class: 'int-btn int-btn--ok', type: 'button', text: this.guarda.ativo ? 'Enviando…' : 'Confirmar', attrs: { 'aria-disabled': this.guarda.ativo ? 'true' : undefined }, on: { click: () => void this.trocar(a.id, v.direcao, v.de) } });
       p.append(h('div', { class: 'int-titulo', text: 'Puxar a orelha' }), h('p', { class: 'int-texto', text: `${v.de} → ${v.para}: o custo sobe` }), h('div', { class: 'int-acoes' }, ok, voltar));
       ok.focus({ preventScroll: true });
     } else {

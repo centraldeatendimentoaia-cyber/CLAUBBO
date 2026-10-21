@@ -22,6 +22,8 @@ export interface AgenteMenu {
   status: string;
   ocioso: boolean;
   obrigadoPossivel: boolean;
+  /** A lista de quem pode receber obrigado ainda não chegou. */
+  carregando?: boolean;
 }
 
 /** A escada do provedor (contas Codex usam a do Codex; qualquer outra, a do Claude). */
@@ -57,7 +59,7 @@ export function menuDoAgente(a: AgenteMenu): ItemMenu[] {
     { acao: 'btw', rotulo: 'Perguntar /btw', atalho: '3', habilitado: true },
     a.obrigadoPossivel
       ? { acao: 'agradecer', rotulo: 'Agradecer pelo trabalho', atalho: '4', habilitado: true }
-      : { acao: 'agradecer', rotulo: 'Agradecer pelo trabalho', atalho: '4', habilitado: false, motivo: 'sem resultado novo' },
+      : { acao: 'agradecer', rotulo: 'Agradecer pelo trabalho', atalho: '4', habilitado: false, motivo: a.carregando ? 'carregando…' : 'sem resultado novo' },
     troca('subir'),
     troca('descer'),
   ];
@@ -69,7 +71,7 @@ export function menuDoElevador(andares: { andar: number; nome: string; temElevad
     .filter((a) => a.temElevador)
     .map((a, i) => ({
       acao: 'andar' as const,
-      rotulo: `Andar ${a.andar} — ${a.nome}`,
+      rotulo: a.nome ? `Andar ${a.andar} — ${a.nome}` : `Andar ${a.andar}`,
       atalho: String(i + 1),
       habilitado: a.andar !== atual,
       ...(a.andar === atual ? { motivo: 'você está aqui' } : {}),
@@ -82,4 +84,34 @@ export function mensagemDaFalha(acao: Acao, status: number, erro: string): strin
   if (status === 409 && acao !== 'agradecer') return 'O modelo já mudou. Atualizei o estado; escolha de novo.';
   if (status === 0) return 'Sem conexão com o servidor.';
   return erro || 'Não deu certo.';
+}
+
+/**
+ * Guarda de execução única: enquanto uma chamada está em voo, novos disparos são ignorados (devolvem `rodou: false`).
+ * Evita duplo envio por Enter repetido, clique duplo ou Espaço (no Firefox o click vem no keyup).
+ */
+export function criarGuarda() {
+  let ativo = false;
+  return {
+    get ativo() {
+      return ativo;
+    },
+    async rodar<T>(fn: () => Promise<T>): Promise<{ rodou: true; valor: T } | { rodou: false }> {
+      if (ativo) return { rodou: false };
+      ativo = true;
+      try {
+        return { rodou: true, valor: await fn() };
+      } finally {
+        ativo = false;
+      }
+    },
+  };
+}
+
+export const ESPERA_LIGAR_MS = 30_000;
+export const TENTATIVAS_LIGAR = 3;
+
+/** Depois de uma tentativa de ligar o boneco que falhou: sempre espera 30 s; na terceira falha desiste até recarregar a página. */
+export function aposFalhaDeLigar(falhas: number, agora: number): { desistiu: boolean; naoAntesDe: number } {
+  return { desistiu: falhas >= TENTATIVAS_LIGAR, naoAntesDe: agora + ESPERA_LIGAR_MS };
 }
