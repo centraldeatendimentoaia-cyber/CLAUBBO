@@ -22,16 +22,20 @@ export function tagsOf(p: PendingItem): Etiqueta[] {
 }
 
 /** Espelha podeDecidir do servidor (o servidor continua sendo quem decide de verdade). */
-export const canDecide = (p: Pick<PendingItem, 'ownerOnly'>, papel: Papel): boolean => papel === 'dono' || (papel === 'equipe' && !p.ownerOnly);
+export const canDecide = (p: Pick<PendingItem, 'ownerOnly'>, papel: Papel): boolean => papel === 'dono' || (papel === 'equipe' && p.ownerOnly === false);
 
 /** Urgente primeiro, depois o mais antigo. Não muta a entrada. */
 export const sortPending = (l: PendingItem[]): PendingItem[] => [...l].sort((a, b) => Number(b.urgent) - Number(a.urgent) || a.since - b.since);
 
 export type Acao = 'aprovar' | 'recusar' | 'abrir';
-/** Botões do cartão. Item que a pessoa não pode decidir ("aguarda o dono") não tem botão nenhum. */
-export function actionsOf(p: PendingItem, papel: Papel): { id: Acao; key: '1' | '2' | '3' }[] {
+/**
+ * Botões do cartão (sem número: 1/2/3 são a posição do cartão). Item que a pessoa não pode decidir ("aguarda o dono") não tem botão.
+ * `deliberada`: item não seguro (diálogo, irreversível, envia mensagem...) só age por clique no botão, nunca por atalho.
+ */
+export function actionsOf(p: PendingItem, papel: Papel): { id: Acao; deliberada: boolean }[] {
   if (!canDecide(p, papel)) return [];
-  return [{ id: 'aprovar', key: '1' }, { id: 'recusar', key: '2' }, { id: 'abrir', key: '3' }];
+  const deliberada = p.safe !== true;
+  return (['aprovar', 'recusar', 'abrir'] as const).map((id) => ({ id, deliberada }));
 }
 
 /** Atalho do cartão na posição `index` (1, 2, 3); do quarto em diante não há. */
@@ -39,44 +43,48 @@ export const shortcutFor = (index: number): '1' | '2' | '3' | null => (['1', '2'
 
 /** Lote seguro: só os itens `safe` que esta pessoa pode decidir. O servidor recalcula a lista; isto só habilita o botão. */
 export function batchState(v: HoldingView): { enabled: boolean; count: number } {
-  const count = v.pendencias.filter((p) => p.safe && canDecide(p, v.papel)).length;
+  const count = (v.pendencias ?? []).filter((p) => p.safe && canDecide(p, v.papel)).length;
   return { enabled: count > 0, count };
 }
 
-/** Tecla pressionada -> o que fazer. Dígito = aprovar o cartão da posição; A = lote seguro. Sem permissão, nada. */
-export function keyAction(v: HoldingView, key: string): { kind: 'lote' } | { kind: 'cartao'; id: string; action: 'aprovar' } | null {
+/**
+ * Tecla pressionada -> o que fazer. Dígito = posição do cartão na ordem exibida (sortPending): item seguro aprova, qualquer outro
+ * que a pessoa possa decidir só abre a revisão. A = lote seguro. O renderer ignora teclas com Ctrl/Cmd/Alt e com foco em campo de texto.
+ */
+export function keyAction(v: HoldingView, key: string): { kind: 'lote' } | { kind: 'cartao'; id: string; action: 'aprovar' | 'abrir' } | null {
   if (key.toLowerCase() === 'a') return batchState(v).enabled ? { kind: 'lote' } : null;
   const i = ['1', '2', '3'].indexOf(key);
-  const p = i < 0 ? undefined : v.pendencias[i];
-  return p && canDecide(p, v.papel) ? { kind: 'cartao', id: p.id, action: 'aprovar' } : null;
+  const p = i < 0 ? undefined : sortPending(v.pendencias ?? [])[i];
+  return p && canDecide(p, v.papel) ? { kind: 'cartao', id: p.id, action: p.safe === true ? 'aprovar' : 'abrir' } : null;
 }
 
 /** Qual estado vazio mostrar: nada esperando decisão; ou, havendo pedidos, nenhuma rotina hoje. */
 export function emptyKind(v: HoldingView): 'nada-esperando' | 'sem-rotinas' | null {
-  if (v.pendencias.length === 0) return 'nada-esperando';
-  return v.rotinas.lista.length === 0 ? 'sem-rotinas' : null;
+  if ((v.pendencias ?? []).length === 0) return 'nada-esperando';
+  return (v.rotinas?.lista ?? []).length === 0 ? 'sem-rotinas' : null;
 }
 
 export type Outcome =
   | { kind: 'feito' }
   | { kind: 'ja-decidido'; texto: string }
+  | { kind: 'mudou'; texto: string }
   | { kind: 'negado'; texto: string }
   | { kind: 'erro'; texto: string };
 
 /** Resposta do servidor a uma decisão. 409 com "já decidido por <nome>" mantém o nome; qualquer outro 409 vira "já decidido". */
 export function decisionOutcome(status: number, error = ''): Outcome {
   if (status >= 200 && status < 300) return { kind: 'feito' };
-  if (status === 409) return { kind: 'ja-decidido', texto: /^já decidido por .+/.test(error) ? error : 'já decidido' };
+  if (status === 409) return /^já decidido por .+/.test(error) ? { kind: 'ja-decidido', texto: error } : { kind: 'mudou', texto: 'o item mudou; atualizando' };
   if (status === 403) return { kind: 'negado', texto: error || 'sem permissão' };
   return { kind: 'erro', texto: error || 'não deu certo' };
 }
 
-/** Aplica o resultado ao painel. Feito ou já decidido tiram o cartão; nunca manda repetir a ação (`repetir` é sempre false). */
-export function applyDecision(v: HoldingView, id: string, o: Outcome): { view: HoldingView; nota?: string; repetir: false } {
+/** Aplica o resultado ao painel. Feito ou já decidido tiram o cartão; "mudou" mantém e pede recarregar. Nunca repete a ação. */
+export function applyDecision(v: HoldingView, id: string, o: Outcome): { view: HoldingView; nota?: string; recarregar?: true } {
   if (o.kind === 'feito' || o.kind === 'ja-decidido') {
-    return { view: { ...v, pendencias: v.pendencias.filter((p) => p.id !== id) }, ...(o.kind === 'ja-decidido' ? { nota: o.texto } : {}), repetir: false };
+    return { view: { ...v, pendencias: (v.pendencias ?? []).filter((p) => p.id !== id) }, ...(o.kind === 'ja-decidido' ? { nota: o.texto } : {}) };
   }
-  return { view: v, nota: o.texto, repetir: false };
+  return { view: v, nota: o.texto, ...(o.kind === 'mudou' ? { recarregar: true as const } : {}) };
 }
 
 export interface Marcador { cor: 'lima' | 'amarelo' | 'turquesa' | 'lilas' | 'rosa'; forma: 'quadrado' | 'losango' | 'circulo' | 'triangulo'; texto: string }
