@@ -91,6 +91,13 @@ describe('painel da holding (renderer)', () => {
     expect(el.textContent).toContain('falhou');
   });
 
+  it('sem saldo do servidor (coins null) o KPI mostra traço, nunca um número', async () => {
+    const { renderHolding, base } = await opts();
+    const el = renderHolding(view(), { ...base, coins: null }) as unknown as FakeEl;
+    expect(el.textContent).toContain('—');
+    expect(el.textContent).not.toContain('🪙');
+  });
+
   it('indicador de rotinas é rodaram/(rodaram+falharam+previstas) e a carteira se chama moedas do escritório', async () => {
     const { el } = await render(view({ rotinas: { rodaram: 1, falharam: 1, previstas: 2, lista: [] } }));
     expect(el.textContent).toContain('1/4');

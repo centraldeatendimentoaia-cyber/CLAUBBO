@@ -317,7 +317,6 @@ export class HoldingPanel implements UiComponent {
     if (this.view && document.hidden) return; // aba escondida: não consulta o servidor à toa
     let raw: string;
     let next: HoldingView;
-    const carteira = saldoDaCarteira(); // em paralelo; nunca rejeita (null = sem número)
     try {
       const res = await fetch('/api/holding');
       raw = await res.text();
@@ -338,8 +337,12 @@ export class HoldingPanel implements UiComponent {
     this.minuto = minuto;
     if (this.view) this.guardarFoco(this.view, next);
     this.view = next;
-    this.coins = await carteira; // saldo do servidor; se falhar, o número some (nunca o do navegador)
-    if (!this.root) return;
+    // saldo do servidor, sem atrasar o primeiro desenho; se falhar, o número some (nunca o do navegador)
+    void saldoDaCarteira().then((c) => {
+      if (!this.root || c === this.coins) return;
+      this.coins = c;
+      this.draw();
+    });
     const ids = new Set(next.pendencias.map((p) => p.id));
     for (const k of [...this.notes.keys()]) if (!ids.has(k)) this.notes.delete(k);
     for (const k of [...this.abertos]) if (!ids.has(k)) this.abertos.delete(k);

@@ -69,5 +69,7 @@ describe('humorRotulo', () => {
     }
     expect(humorRotulo('xyz').palavra).toBe('neutro');
     expect(humorRotulo(undefined).palavra).toBe('neutro');
+    expect(humorRotulo('__proto__').palavra).toBe('neutro');
+    expect(humorRotulo('constructor').palavra).toBe('neutro');
   });
 });

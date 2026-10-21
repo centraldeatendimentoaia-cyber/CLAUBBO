@@ -2,7 +2,7 @@
 // "Desafiar"). As regras, o saldo, a jogada do agente e o humor são do servidor; aqui ficam o desenho, o teclado e a rede.
 // Todo texto vindo do servidor entra só por h()/textContent, nunca como HTML. A lógica testável mora em jogo-model.ts.
 import { desafiarAgente, jogarGesto, lerPartida, saldoDaCarteira } from '../net/interacao-api';
-import { h } from './dom';
+import { h, prefersReducedMotion } from './dom';
 import { criarGuarda } from './interacao-model';
 import { apostasPossiveis, GESTOS, humorRotulo, ICONES_GESTO, mensagemDaFalha, resumoRodada, rotuloGesto, textoResultado, type RodadaJogo } from './jogo-model';
 
@@ -51,7 +51,8 @@ let aberto = false; // um painel de jogo por vez
 export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null {
   if (aberto) return null;
   aberto = true;
-  const reduzido = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduzido = prefersReducedMotion();
+  let fechado = false; // instância fechada: respostas que chegam depois não mexem em tela nem em storage
   const guarda = criarGuarda();
   const voltaFoco = document.activeElement;
   const vivo = h('p', { class: 'jogo-vivo', role: 'status', attrs: { 'aria-live': 'polite' } });
@@ -75,6 +76,8 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
   const dizer = (t: string): void => { vivo.textContent = t; };
 
   function fechar(): void {
+    if (fechado) return;
+    fechado = true;
     clearTimeout(timer);
     window.removeEventListener('keydown', tecla, { capture: true });
     window.removeEventListener('keyup', soltou, { capture: true });
@@ -105,14 +108,14 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
     revelando = false;
     lembrar(agente.id, null);
     aviso = mensagem;
-    void saldoDaCarteira().then((s) => { saldo = s; desenhar(); });
+    void saldoDaCarteira().then((s) => { if (!fechado) { saldo = s; desenhar(); } });
   }
 
   async function iniciar(): Promise<void> {
     const guardado = lembrado(agente.id);
     if (guardado) {
       const r = await lerPartida(guardado);
-      if (!aberto) return;
+      if (fechado) return;
       if (r.ok && r.corpo.fim !== true && r.corpo.estado === 'aberta') {
         aplicarPartida(r.corpo);
         aviso = 'Partida retomada.';
@@ -120,17 +123,24 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
         desenhar();
         return;
       }
-      lembrar(agente.id, null);
+      // só esquece a partida se ela acabou ou não é mais nossa; falha de rede ou 5xx mantém o id para tentar de novo
+      if (r.ok || [403, 404, 410].includes(r.status)) lembrar(agente.id, null);
+      else aviso = mensagemDaFalha(r.status, r.erro);
     }
     saldo = await saldoDaCarteira();
-    if (!aberto) return;
+    if (fechado) return;
     fase = 'aposta';
     desenhar();
   }
 
   async function desafiar(valor: number): Promise<void> {
-    const r = await guarda.rodar(() => desafiarAgente(agente.id, valor));
-    if (!r.rodou || !aberto) return;
+    const andamento = guarda.rodar(() => desafiarAgente(agente.id, valor));
+    desenhar(); // mostra os botões apagados enquanto a chamada está em voo
+    const r = await andamento;
+    if (!r.rodou) return;
+    // a partida existe no servidor mesmo se o painel já fechou: guarda o id para reabrir retomando
+    if (r.valor.ok && typeof r.valor.corpo.id === 'string') lembrar(agente.id, r.valor.corpo.id);
+    if (fechado) return;
     if (r.valor.ok) {
       aposta = valor;
       aplicarPartida({ ...r.valor.corpo, aposta: valor });
@@ -142,24 +152,29 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
     } else {
       aviso = mensagemDaFalha(r.valor.status, r.valor.erro);
       dizer(aviso);
-      void saldoDaCarteira().then((s) => { saldo = s; desenhar(); });
+      void saldoDaCarteira().then((s) => { if (!fechado) { saldo = s; desenhar(); } });
     }
     desenhar();
   }
 
   async function jogar(gesto: string): Promise<void> {
     if (fase !== 'jogando' || revelando) return;
-    const r = await guarda.rodar(() => jogarGesto(id, gesto, rodada));
-    if (!r.rodou || !aberto) return;
+    const andamento = guarda.rodar(() => jogarGesto(id, gesto, rodada));
+    desenhar();
+    const r = await andamento;
+    if (!r.rodou) return;
+    // partida terminada ou sumida: o id guardado não serve mais, mesmo com o painel já fechado
+    if ((r.valor.ok && r.valor.corpo.fim === true) || (!r.valor.ok && [404, 410].includes(r.valor.status))) lembrar(agente.id, null);
+    if (fechado) return;
     if (!r.valor.ok) {
       const { status, erro } = r.valor;
       if (status === 404 || status === 410) voltarParaAposta(mensagemDaFalha(status, erro));
       else {
-        aviso = mensagemDaFalha(status, erro);
+        aviso = status === 409 ? 'A partida mudou; confira o placar e jogue de novo.' : mensagemDaFalha(status, erro);
         if (status === 409) {
           // rodada desatualizada (outra aba, clique duplo): relê o estado em vez de adivinhar
           const lida = await lerPartida(id);
-          if (!aberto) return;
+          if (fechado) return;
           if (lida.ok && lida.corpo.estado === 'aberta') aplicarPartida(lida.corpo);
           else voltarParaAposta(aviso);
         }
@@ -178,7 +193,6 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
       resultado = typeof c.resultado === 'string' ? c.resultado : 'empate';
       humor = typeof c.humor === 'string' ? c.humor : humor;
       fala = typeof c.fala === 'string' ? c.fala : '';
-      lembrar(agente.id, null);
     } else if (ultima) rodada = ultima.numero + 1;
     revelando = !reduzido;
     desenhar();
