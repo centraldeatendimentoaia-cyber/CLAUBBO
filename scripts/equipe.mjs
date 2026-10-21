@@ -5,7 +5,8 @@ import { addPerson, loadTeam } from '../server/core/equipe.mjs';
 
 const [cmd, nome, papel = 'equipe'] = process.argv.slice(2);
 if (cmd === 'add' && nome) {
-  const r = addPerson(config.data, nome, papel);
+  let r;
+  try { r = addPerson(config.data, nome, papel); } catch (e) { r = { error: e.message }; }
   if (r.error) { console.error(r.error); process.exit(1); }
   const porta = process.env.BRIDGE_PORT || 4530;
   console.log(`${nome} (${papel}) cadastrada. Guarde o endereço agora, o token não será mostrado de novo:`);
