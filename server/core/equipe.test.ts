@@ -38,3 +38,34 @@ describe('equipe', () => {
     expect(loadTeam(dir).pessoas).toHaveLength(1);
   });
 });
+
+describe('equipe: endurecimento', () => {
+  it('recusa nomes reservados, também com espaço, caixa e caracteres de largura total', () => {
+    for (const n of ['dono', 'Celular', ' AGENTES ', 'ｄｏｎｏ']) expect(addPerson(dir, n, 'equipe').error).toBeTruthy();
+    expect(fs.existsSync(path.join(dir, 'equipe.json'))).toBe(false);
+  });
+
+  it('unicidade usa NFKC', () => {
+    expect(addPerson(dir, 'Ａna', 'equipe').token).toBeTruthy();
+    expect(addPerson(dir, 'ana', 'equipe').error).toBeTruthy();
+  });
+
+  it('arquivo ilegível ou estragado: lança e não reescreve', () => {
+    const file = path.join(dir, 'equipe.json');
+    fs.writeFileSync(file, '{ não é json');
+    expect(() => addPerson(dir, 'Ana', 'equipe')).toThrow();
+    expect(fs.readFileSync(file, 'utf8')).toBe('{ não é json');
+  });
+
+  it('linha inválida existente não é descartada: lança e mantém o arquivo', () => {
+    const file = path.join(dir, 'equipe.json');
+    const txt = JSON.stringify({ pessoas: [{ nome: 'Velha', papel: 'equipe', hash: 'curto' }] });
+    fs.writeFileSync(file, txt);
+    expect(() => addPerson(dir, 'Ana', 'equipe')).toThrow();
+    expect(fs.readFileSync(file, 'utf8')).toBe(txt);
+  });
+
+  it('personByToken ignora hash de tamanho errado sem lançar', () => {
+    expect(personByToken({ pessoas: [{ nome: 'X', papel: 'equipe', hash: 'abc' }] }, 'a'.repeat(64))).toBeNull();
+  });
+});
