@@ -44,6 +44,13 @@ export function contaDe(chave) {
   return c ? { saldo: c.saldo, ganhou: c.ganhou, perdeu: c.perdeu } : { saldo: 0, ganhou: 0, perdeu: 0 };
 }
 
+/** O id já foi aplicado por `mover` (dentro da janela dos últimos 500 ids)? */
+export const jaMovido = (id) => load().movimentos.includes(id);
+
+/** Contas com saldo positivo cuja chave começa com `prefixo` (ex.: `partida:`), com o extrato. */
+export const contasPorPrefixo = (prefixo) =>
+  Object.entries(load().contas).filter(([k, c]) => k.startsWith(prefixo) && c.saldo > 0).map(([chave, c]) => ({ chave, saldo: c.saldo, extrato: c.extrato }));
+
 export function extratoDe(chave) {
   return [...(load().contas[chave]?.extrato ?? [])].reverse();
 }
@@ -66,11 +73,14 @@ export function mover({ id, de, para, valor, texto, contar }, now = Date.now()) 
   if (origem.saldo < valor) return { ok: false, status: 422, error: 'saldo insuficiente' };
   origem.saldo -= valor;
   destino.saldo += valor;
-  origem.extrato = [...origem.extrato, { at: now, delta: -valor, texto }].slice(-MAX_EXTRATO);
-  destino.extrato = [...destino.extrato, { at: now, delta: valor, texto }].slice(-MAX_EXTRATO);
+  // Contas de partida guardam a contraparte (`com`) para devolver a moeda a quem a colocou, mesmo se o registro da partida se perder.
+  const com = (chave, outra) => (chave.startsWith('partida:') ? { com: outra } : {});
+  origem.extrato = [...origem.extrato, { at: now, delta: -valor, texto, ...com(de, para) }].slice(-MAX_EXTRATO);
+  destino.extrato = [...destino.extrato, { at: now, delta: valor, texto, ...com(para, de) }].slice(-MAX_EXTRATO);
   if (contar && Number.isInteger(contar.valor) && contar.valor > 0) {
-    if (txt(contar.ganhou)) conta(d, contar.ganhou).ganhou += contar.valor;
-    if (txt(contar.perdeu)) conta(d, contar.perdeu).perdeu += contar.valor;
+    // só contas que já existem: o contador nunca abre (nem cria saldo em) uma conta nova
+    if (d.contas[contar.ganhou]) d.contas[contar.ganhou].ganhou += contar.valor;
+    if (d.contas[contar.perdeu]) d.contas[contar.perdeu].perdeu += contar.valor;
   }
   d.movimentos = [...d.movimentos, id].slice(-MAX_MOVIMENTOS);
   writeJson(file(), d);

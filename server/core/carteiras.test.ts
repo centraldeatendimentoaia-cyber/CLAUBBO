@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { config } from './config.mjs';
 // @ts-expect-error módulo .mjs sem tipos
-import { SALDO_INICIAL, contaDe, chaveAgente, chavePessoa, extratoDe, mover, saldoDe, totalGeral } from './carteiras.mjs';
+import { SALDO_INICIAL, contaDe, contasPorPrefixo, jaMovido, chaveAgente, chavePessoa, extratoDe, mover, saldoDe, totalGeral } from './carteiras.mjs';
 
 const oldData = config.data;
 let dir = '';
@@ -114,6 +114,31 @@ describe('mover: validação e limites', () => {
     expect(saldoDe('pessoa:zé')).toBe(0);
     expect(contaDe(bia()).ganhou).toBe(5);
     expect(contaDe(ana()).perdeu).toBe(5);
+  });
+});
+
+describe('mover: apoio às partidas', () => {
+  it('contar não abre nem cria conta que não existe', () => {
+    mover({ id: 'p', de: ana(), para: 'partida:g', valor: 10, texto: 'x' });
+    mover({ id: 'f', de: 'partida:g', para: ana(), valor: 10, texto: 'x', contar: { ganhou: ana(), perdeu: 'pessoa:fantasma', valor: 5 } });
+    const d = JSON.parse(fs.readFileSync(path.join(dir, 'carteiras.json'), 'utf8'));
+    expect(d.contas['pessoa:fantasma']).toBeUndefined();
+    expect(contaDe(ana()).ganhou).toBe(5);
+  });
+  it('jaMovido diz se o id já foi aplicado', () => {
+    expect(jaMovido('m1')).toBe(false);
+    mover({ id: 'm1', de: ana(), para: bia(), valor: 1, texto: 'x' });
+    expect(jaMovido('m1')).toBe(true);
+    mover({ id: 'm2', de: ana(), para: bia(), valor: 1000, texto: 'x' });
+    expect(jaMovido('m2')).toBe(false);
+  });
+  it('contasPorPrefixo lista saldos positivos e o extrato da partida diz de onde veio a moeda', () => {
+    mover({ id: 'a', de: ana(), para: 'partida:z', valor: 10, texto: 'x' });
+    mover({ id: 'b', de: bia(), para: 'partida:z', valor: 5, texto: 'x' });
+    const [z] = contasPorPrefixo('partida:');
+    expect(z).toMatchObject({ chave: 'partida:z', saldo: 15 });
+    expect(z.extrato.map((e: any) => [e.com, e.delta])).toEqual([[ana(), 10], [bia(), 5]]);
+    expect(contasPorPrefixo('pessoa:z')).toEqual([]);
   });
 });
 

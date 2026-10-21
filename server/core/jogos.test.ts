@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { config } from './config.mjs';
 // @ts-expect-error módulo .mjs sem tipos
-import { SALDO_INICIAL, chaveAgente, chavePessoa, contaDe, extratoDe, saldoDe, totalGeral } from './carteiras.mjs';
+import { SALDO_INICIAL, chaveAgente, chavePessoa, contaDe, contasPorPrefixo, extratoDe, mover, saldoDe, totalGeral } from './carteiras.mjs';
 // @ts-expect-error módulo .mjs sem tipos
 import { humorDe } from './humor.mjs';
 // @ts-expect-error módulo .mjs sem tipos
@@ -28,11 +28,12 @@ const caio = { nome: 'Caio', papel: 'dono' };
 const PEDRA = 0, PAPEL = 1, TESOURA = 2;
 
 // `sorteio` devolve a fila de gestos do agente; `t.v` é o relógio.
-function montar(opts: { ocioso?: (id: string) => boolean } = {}) {
+function montar(opts: { ocioso?: (id: string) => any; mover?: any; getAgent?: any } = {}) {
   const fila: number[] = [];
   const t = { v: 1_000_000 };
   const jogos = criarJogos({
-    getAgent: (id: string) => (id === 'zeta' ? null : { id }),
+    getAgent: opts.getAgent ?? ((id: string) => (id === 'zeta' ? null : { id })),
+    ...(opts.mover ? { mover: opts.mover } : {}),
     agenteOcioso: opts.ocioso ?? (() => true),
     sorteio: () => fila.shift() ?? PEDRA,
     agora: () => t.v,
@@ -269,40 +270,173 @@ describe('expiração', () => {
   });
 });
 
+const lerArquivo = () => JSON.parse(fs.readFileSync(path.join(dir, 'jogos.json'), 'utf8'));
+const gravar = (partidas: any) => fs.writeFileSync(path.join(dir, 'jogos.json'), JSON.stringify({ partidas, aberturas: {} }));
+const registro = (id: string, extra: any = {}) => ({ id, pessoa: 'ana', agentId: 'bia', aposta: 10, estado: 'aberta', placar: { pessoa: 0, agente: 0 }, rodadas: [], aberta: 1, ultima: 1_000_000, pago: false, ...extra });
+const reservar = (id: string, pernas = ['pessoa', 'agente']) => {
+  if (pernas.includes('pessoa')) mover({ id: id + ':reserva:pessoa', de: chavePessoa('Ana'), para: 'partida:' + id, valor: 10, texto: 'x' });
+  if (pernas.includes('agente')) mover({ id: id + ':reserva:agente', de: chaveAgente('bia'), para: 'partida:' + id, valor: 10, texto: 'x' });
+};
+
 describe('conservação', () => {
-  it('50 partidas aleatórias não criam nem destroem moeda', () => {
+  it('50 partidas aleatórias (com chamadas repetidas, rodada velha e pessoa errada) não criam nem destroem moeda', () => {
     const { jogos, fila, t } = montar();
     tocar();
     const total = totalGeral();
+    expect(total).toBe(4 * SALDO_INICIAL);
     let seed = 7;
     const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+    const gestos = ['pedra', 'papel', 'tesoura'];
     for (let i = 0; i < 50; i++) {
-      const pessoa = rnd(2) ? ana : caio, agentId = rnd(2) ? 'bia' : 'cida';
+      const pessoa = rnd(2) ? ana : caio, outra = pessoa === ana ? caio : ana, agentId = rnd(2) ? 'bia' : 'cida';
       t.v += 11_000;
       const a = abrir(jogos, pessoa, [5, 10, 25][rnd(3)], agentId);
       if (!a.ok) continue;
       if (rnd(8) === 0) { t.v += 121_000; jogos.ler({ pessoa, id: a.id }); continue; } // abandonada
       for (let n = 1; n <= 6; n++) {
+        const gesto = gestos[rnd(3)];
         fila.push(rnd(3));
-        const r = jogos.jogar({ pessoa, id: a.id, gesto: ['pedra', 'papel', 'tesoura'][rnd(3)], rodada: n });
+        if (rnd(3) === 0) jogos.jogar({ pessoa: outra, id: a.id, gesto, rodada: n }); // pessoa errada
+        if (rnd(3) === 0) jogos.jogar({ pessoa, id: a.id, gesto, rodada: n + 1 + rnd(3) }); // rodada adiantada
+        const r = jogos.jogar({ pessoa, id: a.id, gesto, rodada: n });
+        if (rnd(2) === 0) jogos.jogar({ pessoa, id: a.id, gesto, rodada: n }); // clique duplo
         if (!r.ok || r.fim) break;
       }
     }
     t.v += 300_000;
     jogos.ler({ pessoa: ana, id: 'x' });
+    expect(contasPorPrefixo('partida:')).toEqual([]);
+    const contas = ['pessoa:ana', 'pessoa:caio', 'agente:bia', 'agente:cida'].map((k) => saldoDe(k));
+    for (const c of contas) expect(c).toBeGreaterThanOrEqual(0);
+    expect(contas.reduce((x, y) => x + y, 0)).toBe(total);
     expect(totalGeral()).toBe(total);
-    for (const k of ['pessoa:ana', 'pessoa:caio', 'agente:bia', 'agente:cida']) expect(saldoDe(k)).toBeGreaterThanOrEqual(0);
   });
-  it('guarda no máximo 50 partidas encerradas', () => {
+  it('guarda exatamente 50 partidas encerradas e remove as mais antigas', () => {
     const { jogos, t } = montar();
+    const ids: string[] = [];
     for (let i = 0; i < 60; i++) {
       t.v += 11_000;
       const a = abrir(jogos, ana, 5, 'bia');
-      if (!a.ok) break;
-      perde(jogos, a.id, 1); perde(jogos, a.id, 2);
-      if (saldoDe(chavePessoa('Ana')) < 5) break;
+      expect(a.ok).toBe(true);
+      ids.push(a.id);
+      const f = i % 2 ? ganha : perde;
+      f(jogos, a.id, 1, ana); f(jogos, a.id, 2, ana);
     }
-    const d = JSON.parse(fs.readFileSync(path.join(dir, 'jogos.json'), 'utf8'));
-    expect(Object.keys(d.partidas).length).toBeLessThanOrEqual(50);
+    jogos.ler({ pessoa: ana, id: 'x' });
+    expect(Object.keys(lerArquivo().partidas)).toEqual(ids.slice(10));
+  });
+});
+
+describe('recuperação', () => {
+  it('refaz o pagamento de partida encerrada com pago:false, uma única vez', () => {
+    const { jogos } = montar();
+    tocar();
+    reservar('p1');
+    gravar({ p1: registro('p1', { estado: 'encerrada', resultado: 'pessoa', pago: false }) });
+    expect(jogos.ler({ pessoa: ana, id: 'p1' })).toMatchObject({ ok: true, estado: 'encerrada', saldo: SALDO_INICIAL + 10 });
+    const extrato = extratoDe(chavePessoa('Ana')).length;
+    expect(saldoDe(chaveAgente('bia'))).toBe(SALDO_INICIAL - 10);
+    expect(jogos.ler({ pessoa: ana, id: 'p1' }).saldo).toBe(SALDO_INICIAL + 10);
+    expect(extratoDe(chavePessoa('Ana')).length).toBe(extrato);
+    expect(contaDe(chavePessoa('Ana')).ganhou).toBe(10);
+    expect(lerArquivo().partidas.p1.pago).toBe(true);
+    expect(saldoDe('partida:p1')).toBe(0);
+  });
+  it('refaz a devolução de partida expirada com pago:false, uma única vez', () => {
+    const { jogos } = montar();
+    tocar();
+    reservar('p2');
+    gravar({ p2: registro('p2', { estado: 'expirada', pago: false }) });
+    jogos.ler({ pessoa: ana, id: 'p2' });
+    jogos.ler({ pessoa: ana, id: 'p2' });
+    expect(saldoDe(chavePessoa('Ana'))).toBe(SALDO_INICIAL);
+    expect(saldoDe(chaveAgente('bia'))).toBe(SALDO_INICIAL);
+    expect(totalGeral()).toBe(4 * SALDO_INICIAL);
+  });
+  it('partida "reservando" devolve só a perna que foi reservada', () => {
+    const { jogos } = montar();
+    tocar();
+    reservar('p3', ['pessoa']);
+    gravar({ p3: registro('p3', { estado: 'reservando' }) });
+    jogos.ler({ pessoa: ana, id: 'x' });
+    expect(saldoDe(chavePessoa('Ana'))).toBe(SALDO_INICIAL);
+    expect(saldoDe(chaveAgente('bia'))).toBe(SALDO_INICIAL);
+    expect(lerArquivo().partidas.p3).toBeUndefined();
+    expect(abrir(jogos).ok).toBe(true); // pessoa e agente seguem livres
+  });
+  it('partida "reservando" com as duas pernas devolve as duas', () => {
+    const { jogos } = montar();
+    tocar();
+    reservar('p4');
+    gravar({ p4: registro('p4', { estado: 'reservando' }) });
+    jogos.ler({ pessoa: ana, id: 'x' });
+    expect(saldoDe(chavePessoa('Ana'))).toBe(SALDO_INICIAL);
+    expect(saldoDe(chaveAgente('bia'))).toBe(SALDO_INICIAL);
+    expect(lerArquivo().partidas.p4).toBeUndefined();
+  });
+  it('registro malformado é descartado e a moeda da conta órfã volta a quem a colocou', () => {
+    const { jogos } = montar();
+    tocar();
+    reservar('p5');
+    reservar('p6');
+    gravar({ p5: registro('p5', { rodadas: 'lixo' }), p6: null }); // p6: sem registro algum
+    expect(jogos.ler({ pessoa: ana, id: 'p5' })).toMatchObject({ ok: false, status: 404 });
+    expect(saldoDe(chavePessoa('Ana'))).toBe(SALDO_INICIAL);
+    expect(saldoDe(chaveAgente('bia'))).toBe(SALDO_INICIAL);
+    expect(contasPorPrefixo('partida:')).toEqual([]);
+  });
+  it('se a segunda reserva falha (422 ou exceção), a primeira volta e nada fica preso', () => {
+    for (const modo of ['422', 'throw']) {
+      fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir);
+      const falha = (a: any) => {
+        if (String(a.id).endsWith(':reserva:agente')) { if (modo === 'throw') throw new Error('disco'); return { ok: false, status: 422, error: 'saldo insuficiente' }; }
+        return mover(a);
+      };
+      const { jogos } = montar({ mover: falha });
+      tocar();
+      expect(abrir(jogos).ok).toBe(false);
+      expect(saldoDe(chavePessoa('Ana'))).toBe(SALDO_INICIAL);
+      expect(saldoDe(chaveAgente('bia'))).toBe(SALDO_INICIAL);
+      expect(contasPorPrefixo('partida:')).toEqual([]);
+      expect(Object.keys(lerArquivo().partidas)).toEqual([]);
+      expect(abrir(montar().jogos).ok).toBe(true); // pessoa e agente livres
+    }
+  });
+});
+
+describe('intervalo e estado', () => {
+  it('o intervalo de 10 s conta também do fim da partida', () => {
+    const { jogos, t } = montar();
+    const a = abrir(jogos);
+    t.v += 100_000;
+    ganha(jogos, a.id, 1); ganha(jogos, a.id, 2);
+    t.v += 5_000;
+    expect(abrir(jogos)).toMatchObject({ ok: false, status: 429 });
+    t.v += 5_000;
+    expect(abrir(jogos).ok).toBe(true);
+  });
+  it('o intervalo de 10 s conta também da expiração', () => {
+    const { jogos, t } = montar();
+    abrir(jogos);
+    t.v += 200_000;
+    expect(abrir(jogos)).toMatchObject({ ok: false, status: 429 });
+    t.v += 10_000;
+    expect(abrir(jogos).ok).toBe(true);
+  });
+  it('partida encerrada ou expirada não anuncia próxima rodada', () => {
+    const { jogos, t } = montar();
+    const a = abrir(jogos);
+    expect(jogos.ler({ pessoa: ana, id: a.id }).rodada).toBe(1);
+    ganha(jogos, a.id, 1); ganha(jogos, a.id, 2);
+    expect(jogos.ler({ pessoa: ana, id: a.id }).rodada).toBeNull();
+    t.v += 20_000;
+    const b = abrir(jogos);
+    t.v += 200_000;
+    expect(jogos.ler({ pessoa: ana, id: b.id }).rodada).toBeNull();
+  });
+  it('getAgent ou agenteOcioso assíncronos são recusados', () => {
+    expect(() => abrir(montar({ getAgent: () => Promise.resolve({}) }).jogos)).toThrow(/síncron/);
+    expect(() => abrir(montar({ ocioso: () => Promise.resolve(true) }).jogos)).toThrow(/síncron/);
+    expect(saldoDe(chavePessoa('Ana'))).toBe(SALDO_INICIAL);
   });
 });
