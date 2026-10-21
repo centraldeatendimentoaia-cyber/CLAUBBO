@@ -339,7 +339,7 @@ const saveProps = () => writeJson(PROP_FILE, agentProposals.slice(-50));
 // Uma por vez; quem responde roda sem cli-agents, então não encadeia chamadas.
 const CALL_FILE = path.join(config.data, 'agent-calls.json');
 const callStore = readJson(CALL_FILE, { grants: [], calls: [] });
-const btw = criarBtw({ runTurn, getAgent, systemFor });
+const btw = criarBtw({ runTurn, getAgent, systemFor, providerReal: (a) => getAccount(a.account)?.provider });
 const saveCalls = () => writeJson(CALL_FILE, { grants: callStore.grants, calls: callStore.calls.slice(-50) });
 const granted = (from, to) => callStore.grants.some((g) => g.from === from && g.to === to);
 const callBusy = () => callStore.calls.some((c) => c.state === 'running');

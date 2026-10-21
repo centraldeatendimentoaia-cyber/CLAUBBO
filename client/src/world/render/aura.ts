@@ -33,9 +33,9 @@ export function auraDe(model: string | undefined, provider?: string): AuraSpec |
   if (provider === 'codex') {
     const i = (ESCADAS_AURA.codex as readonly string[]).indexOf(model);
     if (i < 0) return null;
-    // os dois degraus de cima são intermediária e chama; o de baixo é singela
+    // só o fable tem chama: o topo do Codex é intermediária e os degraus abaixo são singela
     const topo = ESCADAS_AURA.codex.length - 1;
-    return { ...(i === topo ? CHAMA : i === topo - 1 ? INTERMEDIARIA : SINGELA_HAIKU), rotulo: model };
+    return { ...(i === topo ? INTERMEDIARIA : SINGELA_HAIKU), rotulo: model };
   }
   switch (model) {
     case 'haiku':

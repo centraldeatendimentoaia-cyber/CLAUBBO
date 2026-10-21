@@ -18,6 +18,19 @@ function montar(opts: { texto?: string; falha?: boolean; pendente?: boolean } = 
 }
 
 describe('btw', () => {
+  it('agente Codex (por id ou pela conta real): 409 sem chamar runTurn e sem gastar o intervalo', async () => {
+    const runTurn = vi.fn(() => Promise.resolve({ text: 'x' }));
+    const cx = { ...agente, id: 'cx', account: 'codex-2', model: 'gpt-5.2-codex' };
+    const viaConta = { ...agente, id: 'vc', account: 'minha' };
+    const btw = criarBtw({ runTurn, getAgent: (id: string) => (id === 'cx' ? cx : id === 'vc' ? viaConta : null), providerReal: (a: { id: string }) => (a.id === 'vc' ? 'codex' : undefined) });
+    expect(await btw({ pessoa, agentId: 'cx', pergunta: 'oi' })).toMatchObject({ ok: false, status: 409 });
+    expect(await btw({ pessoa, agentId: 'vc', pergunta: 'oi' })).toMatchObject({ ok: false, status: 409 });
+    expect(runTurn).not.toHaveBeenCalled();
+  });
+  it('falha do runner: 502 com mensagem genérica, sem vazar o texto do erro', async () => {
+    const { btw } = montar({ falha: true });
+    expect(await btw({ pessoa, agentId: 'ana', pergunta: 'oi' })).toEqual({ ok: false, status: 502, error: 'o agente não respondeu' });
+  });
   it('pergunta válida: 200 e runTurn sem ferramentas, sem dev, sem sessão', async () => {
     const { btw, runTurn } = montar();
     const r = await btw({ pessoa, agentId: 'ana', pergunta: 'Quanto falta?' });

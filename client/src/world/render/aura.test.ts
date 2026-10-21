@@ -59,11 +59,11 @@ describe('auraDe', () => {
     }
   });
 
-  it('Codex segue a posição na escada: base singela, os dois de cima intermediária e chama', () => {
+  it('Codex segue a posição na escada: só o topo é intermediária, sem chama (chama é só do fable)', () => {
     const [base, meio, topo] = ESCADAS.codex as string[];
     expect(auraDe(base, 'codex')?.nivel).toBe('singela');
-    expect(auraDe(meio, 'codex')?.nivel).toBe('intermediaria');
-    expect(auraDe(topo, 'codex')?.nivel).toBe('chama');
+    expect(auraDe(meio, 'codex')?.nivel).toBe('singela');
+    expect(auraDe(topo, 'codex')?.nivel).toBe('intermediaria');
     expect(auraDe(topo, 'codex')?.rotulo).toBe(topo);
     // modelo do Claude não vale para o Codex e vice-versa
     expect(auraDe('fable', 'codex')).toBeNull();

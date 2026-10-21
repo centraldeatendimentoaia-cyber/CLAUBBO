@@ -563,19 +563,15 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   };
 
   const player: PlayerWorld = {
-    // Atenção: além de pôr o boneco no elevador do andar 1, chama setFloor(1), que muda a vista e grava `ev2.floor`.
+    // O boneco nasce no elevador do andar que está na tela; não troca de andar nem sobrescreve `ev2.floor`.
     ligar: (me) => {
       playerMe = { name: me.name, look: me.look, ...(me.parts ? { parts: me.parts } : {}) };
       playerKeys.clear();
       playerShift = false;
       pendingPlayerFloor = null;
       playerIntent = { ...NO_INTENT };
-      placePlayer(playback ? null : 1);
-      if (!playback && !suspended) {
-        // quem liga quer se ver: mostra o andar 1, onde o boneco nasce
-        setFloor(1);
-        followVisitor();
-      }
+      placePlayer(playback ? null : activeFloor);
+      if (!playback && !suspended && !userMoved) followVisitor();
     },
     desligar: () => {
       playerMe = null;

@@ -82,7 +82,7 @@ export function menuDoElevador(andares: { andar: number; nome: string; temElevad
 
 /** O texto que o jogador lê quando uma ação volta com erro; o servidor decide e explica (403, 409...), aqui só se acolhe. */
 export function mensagemDaFalha(acao: Acao, status: number, erro: string): string {
-  if (status === 409 && acao !== 'agradecer') return 'O modelo já mudou. Atualizei o estado; escolha de novo.';
+  if (status === 409 && (acao === 'subir' || acao === 'descer')) return 'O modelo já mudou. Atualizei o estado; escolha de novo.';
   if (status === 0) return 'Sem conexão com o servidor.';
   return erro || 'Não deu certo.';
 }
