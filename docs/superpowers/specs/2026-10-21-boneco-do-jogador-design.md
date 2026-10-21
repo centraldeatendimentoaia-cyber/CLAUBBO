@@ -26,14 +26,14 @@ Já existe parte da base: a cena de visita a outros prédios tem um boneco que a
 
 - Jogos em si, moedas, humor do agente e carteira no servidor: projeto 4. Aqui, "Desafiar" só entrega o convite e o ponto de entrada.
 - Arte nova do boneco, dos agentes e dos quartos: projeto 5. O boneco usa o personagem e a aparência que já existem.
-- Dois jogadores ou a equipe com boneco no escritório do dono. Esta versão tem um boneco, o do dono.
+- Ver o boneco de outra pessoa em tempo real. Cada pessoa vê só o próprio boneco na própria página; boneco compartilhado entre pessoas fica para depois.
 - Controles de toque no celular. Os pedidos da página do celular continuam como estão.
 - Interação com móveis e objetos além do elevador e dos agentes.
 
 ## Antiobjetivos (seria fracasso mesmo funcionando)
 
 - Subir o modelo de um agente sem o dono ter feito o gesto de propósito, ou sem registro. Subir custa dinheiro.
-- A equipe ou o celular conseguirem trocar modelo, agradecer ou rebaixar. Só o dono.
+- Qualquer pessoa sem cadastro (token da instalação sem nome, ou token inválido) conseguir trocar modelo, agradecer ou rebaixar. Só o dono e as pessoas da equipe cadastradas em `data/equipe.json`, com nome, podem.
 - XP por agradecer sem resultado verificado, ou o mesmo resultado agradecido duas vezes.
 - Estado do modelo comunicado só por cor.
 - Cópia de arte, nomes ou formatos de outro jogo. A aura em forma de chama é um efeito original de energia desenhado aqui, sem reproduzir personagens ou sprites de terceiros.
@@ -62,10 +62,11 @@ Já existe parte da base: a cena de visita a outros prédios tem um boneco que a
 
 ## Decisões tomadas pelo autor do documento (a conferir)
 
-- Só o dono usa o boneco e o menu. Para a equipe e para o celular, nada muda. Todas as ações do menu que mudam o estado (modelo, XP, `/btw`) são `ownerOnly` no servidor, pela mesma tabela de risco do painel da holding, não só escondidas na página.
+- Decisão do dono: toda a equipe convidada faz as mesmas ações do dono no menu (conversar, `/btw`, agradecer, puxar a orelha, baixar o modelo, elevador). Cada pessoa cadastrada tem o próprio boneco na própria página. No servidor, as ações exigem papel `dono` ou `equipe` com nome (token por pessoa), e todas vão para `data/auditoria.jsonl` com o campo `nome`. Quem não tem nome (token só da instalação, agente com `x-v2-agente`) continua recusado.
 - Subir o modelo custa mais, mas a ação nasce de um clique do próprio dono na página dele. Por isso a decisão é: sem janela de confirmação do Windows, e sim uma confirmação dentro do menu mostrando o modelo de origem, o de destino e que o custo sobe. Baixar o modelo não pede confirmação. Ambas ficam em `data/auditoria.jsonl`. Se o dono preferir a janela do Windows na subida, é uma troca de uma linha na tabela de risco.
 - Alcance e foco: o alvo é o interagível mais perto dentro de cerca de 1,5 casa na frente do boneco. Sem alvo, `E` não faz nada. Com mais de um, vale o mais perto.
 - `/btw`: uma pergunta de uma rodada, feita pelo mesmo mecanismo de execução dos agentes (`runTurn`), sem ferramentas, em sessão separada, com o prompt de sistema do agente. A resposta aparece num balão perto do agente e não entra na fila de tarefas dele, nem altera `data/` de tarefas. Se o agente estiver em tarefa de código, o `/btw` não toca na tarefa. Fica limitado em tamanho de pergunta e resposta e tem um intervalo mínimo entre perguntas, para não virar um canal de gasto sem controle.
+- Agradecer pela equipe: a chave `obrigado:<id>` é única por resultado, então vários agradecimentos ao mesmo resultado rendem XP uma vez só, de quem agradecer primeiro (os outros recebem 409 "já agradecido por <nome>"). Isso difere do "Ficou bom" do painel, que continua só do dono por decisão anterior.
 - Agradecer: o botão só fica habilitado se o agente tem um resultado verificado ainda não agradecido (tarefa concluída pelo dono ou rotina concluída sem erro). A chave de XP é `obrigado:<id do resultado>`, única. Quando o agradecimento pertence a um cartão que o dono já marcou com "Ficou bom", não soma de novo.
 - "Desafiar": no projeto 3 a opção existe, aparece habilitada só para agente ocioso, e leva a uma tela de convite que diz que os jogos chegam no próximo projeto. Nada de moeda ou humor aqui.
 - Elevador: o menu lista os andares que o snapshot já informa (`rooms[].floor`, mais os andares 1 e 2). Escolher um andar usa a troca de andar que já existe (`setFloor`) e leva o boneco para o elevador do andar de destino. Nenhum agente é tocado.
@@ -75,7 +76,7 @@ Já existe parte da base: a cena de visita a outros prédios tem um boneco que a
 
 ### Respostas à checagem do construtor (decisões do autor, a conferir)
 
-- A tabela de risco já existe: o painel da holding foi mesclado na `main` e a classificação mora em `server/core/pendencias.mjs` (`classify`, com `ownerOnly`). Este projeto estende essa tabela com as novas ações (`modelo:subir`, `modelo:descer`, `agradecer`, `btw`, todas `ownerOnly`), em vez de criar outra.
+- A tabela de risco já existe: o painel da holding foi mesclado na `main` e a classificação mora em `server/core/pendencias.mjs` (`classify`, com `ownerOnly`). Este projeto estende essa tabela com as novas ações (`modelo:subir`, `modelo:descer`, `agradecer`, `btw`, liberadas para `dono` e `equipe`, nunca `ownerOnly`), em vez de criar outra.
 - Agradecer: o id canônico do resultado é o id da tarefa (`tarefa:<id>`) ou o id da execução da rotina (`rotina:<id>`), os mesmos que o `xp.mjs` já usa em `bom:<id>` e `rotina:<id>`. A chave nova é `obrigado:<id>`. Se já existe `bom:<id>` para o mesmo resultado, agradecer não soma XP (o botão mostra "já reconhecido"). O botão só habilita para o resultado mais recente ainda sem `bom:` nem `obrigado:`, e o servidor confere isso, não a página.
 - Subir o modelo: quem protege o dono é o servidor, não a confirmação da tela. A rota exige o papel `dono` e recebe o degrau esperado (`de` e `para`). Se o modelo atual do agente não for o `de`, responde 409 sem mudar nada, o que impede clique repetido ou duplo salto. A confirmação da tela é só um passo de interface.
 - Troca de modelo e `effort`: ao trocar, o servidor revalida o agente inteiro pela validação existente em `agents.mjs`. Se o `effort` atual não valer para o novo modelo, o servidor mantém o `effort` e rejeita a troca com o motivo, sem gravar estado inválido.
@@ -95,7 +96,7 @@ Já existe parte da base: a cena de visita a outros prédios tem um boneco que a
 
 - O dono abre o escritório, anda até um agente com o teclado e abre o menu com `E`.
 - Conversar abre o terminal do agente certo. `/btw` devolve uma resposta sem interromper uma tarefa em andamento do agente.
-- Puxar a orelha troca o modelo do agente um degrau acima, mostra a nova aura e fica registrado na auditoria; baixar faz o inverso. Equipe e celular recebem 403 nessas ações.
+- Puxar a orelha troca o modelo do agente um degrau acima, mostra a nova aura e fica registrado na auditoria; baixar faz o inverso. Pessoa sem cadastro, token inválido e agente recebem 403 nessas ações. A equipe cadastrada consegue, e o nome dela fica na auditoria.
 - Agradecer rende XP uma única vez por resultado e nunca sem resultado verificado.
 - O `fable` aparece com a chama e o `opus` com o brilho intermediário; `haiku` e `sonnet` quase não chamam atenção. O nome do modelo está sempre disponível em texto.
 - O elevador troca o dono de andar sem mexer nos agentes.
