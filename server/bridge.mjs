@@ -50,7 +50,7 @@ import { cleanFolder, cleanSystem, stripSystem } from './core/system-config.mjs'
 import { IPV4, PHONE_WRITES, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
 import { loadTeam } from './core/equipe.mjs';
 import { buildPending, decisionOf, rememberDecision } from './core/pendencias.mjs';
-import { buildHolding, confirmarAntesDeAgir, lotesSeguros, podeDecidir } from './core/holding.mjs';
+import { buildHolding, confirmarAntesDeAgir, dispensaJanela, lotesSeguros, podeDecidir, reservarEntrega } from './core/holding.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import * as xp from './core/xp.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
@@ -365,9 +365,15 @@ let access = null; // tokens da instalação (data/acesso.json), lidos na subida
 /** Quem usa o token `agentes` (servidor MCP cli-agents) só cria coisas que esperam o OK do João. */
 const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-calls)$/;
 /** Pede o "sim" de uma pessoa diante do computador (janela do Windows). Recusado: já responde o erro e devolve false. */
-/** Vindo do celular (já passou pelo token do QR code) numa rota de aprovar/recusar, quem decide é a pessoa no celular: não abre a janela. Qualquer outra escrita do celular ainda pede o "sim" no computador. */
-/** Com `pid` (id da pendência), a janela só abre se o item pedir (needsDialog); item desconhecido sempre abre. Sem `pid`, sempre abre. */
-const human = async (res, what, pid) => { const r = (fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname)) || (pid && pendingNow().find((x) => x.id === pid)?.needsDialog === false) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
+/** A janela só é dispensada para o dono no celular numa rota de aprovar/recusar, ou para item que não pede janela (`pid`; item desconhecido sempre abre). `sempre` ("para sempre") e qualquer outra escrita sempre abrem. */
+const human = async (res, what, pid, { sempre = false } = {}) => {
+  const req = res.req;
+  const item = pid ? pendingNow().find((x) => x.id === pid) : undefined;
+  const dispensa = dispensaJanela({ rede: fromNetwork(req), ehEscritaDoCelular: PHONE_WRITES.test(new URL(req.url, 'http://x').pathname), pessoa: req.pessoa, sempre, item });
+  const r = dispensa ? { ok: true } : await confirmHuman(what);
+  if (!r.ok) json(res, r.status, { error: r.error });
+  return r.ok;
+};
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
@@ -383,7 +389,7 @@ const gatePending = (req, res, pid) => {
 };
 /** Depois de cada await entre o gate e a ação: o item segue pendente no mesmo estágio e a pessoa ainda pode decidi-lo? false = já respondeu. */
 const recheck = (req, res, pid, gate) => {
-  const r = confirmarAntesDeAgir({ pendingNow, pid, pessoa: req.pessoa, estagio: gate.stage });
+  const r = confirmarAntesDeAgir({ pendingNow, pid, pessoa: req.pessoa, estagio: gate.stage, decisionOf });
   if (!r.ok) json(res, r.status, { error: r.error });
   return r.ok;
 };
@@ -515,6 +521,7 @@ async function route(req, res, url) {
   // ---- permissões pedidas por terminais do Claude Code (andar 2): quem decide é a página, a entrega é do Claubbo original
   if ((m = /^\/api\/permissions\/([^/]+)(\/decision)?$/.exec(p))) {
     if (m[2] && !pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode decidir' });
+    if (m[2] && req.pessoa?.papel !== 'dono') return json(res, 403, { error: 'só o dono pode liberar permissões de terminal' });
     const body = method === 'POST' ? await readBody(req) : undefined;
     if (m[2] && body?.behavior !== 'deny' && body?.behavior !== 'terminal' && !(await human(res, `Liberar uma permissão pedida por um terminal do Claude Code (pedido ${clip(m[1], 40)}, resposta: ${clip(body?.behavior, 20)})?`))) return;
     const r = await habCall(`/api/permissions/${encodeURIComponent(m[1])}${m[2] || ''}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }).catch(() => null);
@@ -780,7 +787,7 @@ ${logs}` : ''}`;
       if (item.kind === 'tarefa') ok = (await approve(item.ref)).ok; // chamada tem custo (cost:true), nunca é safe: hoje só tarefa de plano entra no lote
       if (!ok) continue;
       rememberDecision(pid, req.pessoa.nome);
-      auditRecord(config.data, { who: 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/pendencias/aprovar-seguros#${pid}`, status: 200 });
+      auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/pendencias/aprovar-seguros#${pid}`, status: 200 });
       aprovados.push(pid);
     }
     if (aprovados.length) pollSoon();
@@ -788,15 +795,21 @@ ${logs}` : ''}`;
   }
   if (p === '/api/ops/tasks' && method === 'POST') { const r = createTask(await readBody(req)); if (!r.ok) return fail(res, r); pollSoon(); return json(res, 201, r.task); }
   if ((m = /^\/api\/ops\/tasks\/([^/]+)\/(approve|reject|retry)$/.exec(p)) && method === 'POST') {
-    if (m[2] !== 'retry' && !pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar ou recusar' });
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar, recusar ou repetir' });
     const pid = `tarefa:${m[1]}`;
     const body = await readBody(req); // antes do gate: nada assíncrono entre classificar e agir além do diálogo
+    const comFerramentas = m[2] === 'retry' && (Array.isArray(body.allow) ? body.allow.length > 0 : !!body.allow); // repetir liberando ferramentas amplia o poder da tarefa
+    if (comFerramentas) {
+      if (req.pessoa?.papel !== 'dono') return json(res, 403, { error: 'só o dono pode liberar ferramentas numa tarefa' });
+      if (!(await human(res, `Repetir a tarefa ${clip(m[1], 40)} liberando ferramentas: ${clip(JSON.stringify(body.allow), 200)}?`))) return;
+    }
     const gate = m[2] === 'retry' ? true : gatePending(req, res, pid);
     if (!gate) return;
     if (m[2] === 'approve' && !(await human(res, taskApproveText(listTasks().find((x) => x.id === m[1])), pid))) return;
     if (m[2] !== 'retry' && !recheck(req, res, pid, gate)) return; // o estágio pode ter mudado durante o diálogo
+    if (m[2] === 'approve') rememberDecision(pid, req.pessoa.nome); // antes do await de approve(): quem chegar depois leva 409 com o nome
     const r = m[2] === 'approve' ? await approve(m[1]) : m[2] === 'reject' ? reject(m[1], body.feedback) : retryWithTools(m[1], body.allow);
-    if (r.ok && m[2] !== 'retry') rememberDecision(pid, req.pessoa.nome);
+    if (r.ok && m[2] === 'reject') rememberDecision(pid, req.pessoa.nome);
     pollSoon();
     return r.ok ? json(res, 200, { ok: true, ...(r.commit !== undefined ? { commit: r.commit } : {}), ...(r.task ? { task: r.task } : {}) }) : fail(res, r);
   }
@@ -890,10 +903,10 @@ ${logs}` : ''}`;
     if (!item || item.state !== 'pending') return json(res, 404, { error: 'pedido não está esperando aprovação' });
     if (m[2] === 'reject') { item.state = 'rejected'; saveCli(); rememberDecision(pid, req.pessoa.nome); return json(res, 200, item); }
     if (!(await human(res, `Enviar ao terminal "${clip(item.agentName, 40)}" o pedido de ${clip(item.from, 40)}: ${clip(item.text, 500)}`, pid))) return;
-    if (item.state !== 'pending') return json(res, 409, { error: 'o pedido mudou enquanto a confirmação estava aberta' });
     if (!recheck(req, res, pid, gate)) return;
+    const rs = reservarEntrega(item, pid, req.pessoa.nome, rememberDecision, decisionOf); // síncrono: a segunda decisão não entrega de novo
+    if (!rs.ok) return json(res, rs.status, { error: rs.error });
     await deliverCli(item);
-    rememberDecision(pid, req.pessoa.nome);
     return json(res, 200, item);
   }
 
@@ -988,7 +1001,8 @@ ${logs}` : ''}`;
     if (m[2] === 'reject') { c.state = 'rejected'; saveCalls(); rememberDecision(pid, req.pessoa.nome); return json(res, 200, c); }
     if (callBusy()) return json(res, 429, { error: 'já há uma chamada em andamento' });
     const { always } = await readBody(req);
-    if (!(await human(res, `Deixar ${clip(c.fromName, 40)} chamar ${clip(c.toName, 40)}${always === true ? ' PARA SEMPRE' : ''}: ${clip(c.text, 400)}`, always === true ? undefined : pid))) return; // "para sempre" é um poder maior que a chamada: sempre pede o "sim"
+    if (always === true && req.pessoa?.papel !== 'dono') return json(res, 403, { error: 'só o dono pode liberar uma chamada para sempre' });
+    if (!(await human(res, `Deixar ${clip(c.fromName, 40)} chamar ${clip(c.toName, 40)}${always === true ? ' PARA SEMPRE' : ''}: ${clip(c.text, 400)}`, pid, { sempre: always === true }))) return; // "para sempre" é um poder maior que a chamada: sempre pede o "sim"
     if (c.state !== 'pending' || callBusy()) return json(res, 409, { error: 'a chamada mudou enquanto a confirmação estava aberta' });
     if (!recheck(req, res, pid, gate)) return;
     if (always === true && !granted(c.from, c.to)) callStore.grants.push({ from: c.from, to: c.to });

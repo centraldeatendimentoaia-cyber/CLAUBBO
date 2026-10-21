@@ -104,6 +104,17 @@ describe('modo celular', () => {
       expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/chat'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
       expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/ops/tasks/abc/approve'), TOKEN, 4530, team).action).toBe('allow');
     });
+
+    it('com V2_CELULAR_ESCRITA=1 só o token do dono escreve fora de aprovar/recusar; a equipe nunca (I2)', () => {
+      process.env.V2_CELULAR_ESCRITA = '1';
+      try {
+        expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/chat'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+        expect(phoneGate(req('DELETE', `v2_cel_4530=${ANA}`), url('/api/agents/x'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+        expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/ops/tasks/abc/approve'), TOKEN, 4530, team).action).toBe('allow');
+        expect(phoneGate(req('POST', `v2_cel_4530=${TOKEN}`), url('/api/chat'), TOKEN, 4530, team).action).toBe('allow');
+        expect(phoneGate(req('POST', ''), url('/api/chat'), TOKEN, 4530, team).action).toBe('deny');
+      } finally { delete process.env.V2_CELULAR_ESCRITA; }
+    });
   });
 
   it('sem token configurado nada passa', () => {

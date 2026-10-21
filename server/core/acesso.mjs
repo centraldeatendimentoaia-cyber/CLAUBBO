@@ -74,7 +74,8 @@ const CELULAR = { nome: 'celular', papel: 'dono' };
 export function phoneGate(req, url, token, port, team) {
   const read = req.method === 'GET' || req.method === 'HEAD';
   const writeAll = process.env.V2_CELULAR_ESCRITA === '1'; // opt-in: o celular escreve como a página (só aprovar e recusar dispensam o "sim" no computador)
-  if (!read && !writeAll && !(req.method === 'POST' && PHONE_WRITES.test(url.pathname))) return { action: 'deny', status: 403, error: 'celular: só aprovar e recusar; o resto é somente leitura' };
+  const soAprovar = req.method === 'POST' && PHONE_WRITES.test(url.pathname);
+  if (!read && !writeAll && !soAprovar) return { action: 'deny', status: 403, error: 'celular: só aprovar e recusar; o resto é somente leitura' };
   const given = read ? url.searchParams.get('t') : null; // escrita só vale com o cookie, nunca com o token na URL
   const who = (t) => (t && token && same(t, token) ? CELULAR : personByToken(team, t)); // o token do QR code vale como dono; o de uma pessoa, com o papel dela
   if (who(given)) {
@@ -84,6 +85,7 @@ export function phoneGate(req, url, token, port, team) {
   }
   const cookie = readCookie(req, phoneCookieName(port));
   const person = who(cookie);
+  if (person && !read && !soAprovar && person.papel !== 'dono') return { action: 'deny', status: 403, error: 'celular: só o dono escreve fora de aprovar e recusar' }; // writeAll vale só para o token do dono
   if (person) return { action: 'allow', person };
   return { action: 'deny', status: 403, error: 'celular: abra o endereço pelo QR code mostrado no computador' };
 }

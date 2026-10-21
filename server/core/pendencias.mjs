@@ -10,12 +10,14 @@ const RISCO = {
   'tarefa:test': { ...BASE, reversible: false, ownerOnly: true, needsDialog: true },
   terminal: { ...BASE, reversible: false, sendsMessage: true, ownerOnly: true, needsDialog: true },
   proposta: { ...BASE, ownerOnly: true, needsDialog: true },
+  'proposta:criar': { ...BASE, ownerOnly: true, needsDialog: true },
+  'proposta:excluir': { ...BASE, reversible: false, ownerOnly: true, needsDialog: true }, // excluir agente é permanente
   chamada: { ...BASE, cost: true },
 };
 const DESCONHECIDO = { ...BASE, reversible: false, ownerOnly: true, needsDialog: true };
 
 export function classify(kind, stage) {
-  const key = kind === 'tarefa' ? `tarefa:${stage}` : kind;
+  const key = kind === 'tarefa' ? `tarefa:${stage}` : kind === 'proposta' && stage ? `proposta:${stage}` : kind;
   const r = Object.hasOwn(RISCO, key) ? RISCO[key] : DESCONHECIDO;
   const safe = !r.cost && r.reversible && !r.sendsMessage && !r.ownerOnly && !r.needsDialog;
   return { ...r, safe };
@@ -32,12 +34,12 @@ export function buildPending({ tasks = [], cliRequests = [], proposals = [], cal
     if (t.state === 'waiting' && t.dev?.awaiting) add('tarefa', t.id, t.dev.stage, t.agent, t.title || t.text, t.text, t.updatedAt ?? t.addedAt ?? now);
   }
   for (const r of cliRequests) {
-    if (r.state === 'pending') add('terminal', r.id, undefined, r.agentName, `Terminal: ${r.agentName ?? ''}`, r.text, r.at ?? now);
+    if (r.state === 'pending') add('terminal', r.id, undefined, `${r.from ?? '?'} (relatado pelo agente)`, `Terminal ${r.agentName ?? ''}: pedido de ${r.from ?? '?'}`, r.text, r.at ?? now);
   }
   for (const p of proposals) {
     if (p.state !== 'pending') continue;
-    const nome = p.agent?.name ?? '';
-    add('proposta', p.id, undefined, p.from, p.delete ? `Excluir agente ${nome}` : `Criar agente ${nome}`, p.agent?.does ?? '', p.at ?? now);
+    const nome = p.delete ? p.name : p.agent?.name;
+    add('proposta', p.id, p.delete ? 'excluir' : 'criar', `${p.from ?? '?'} (relatado pelo agente)`, p.delete ? `Excluir agente ${nome ?? ''}` : `Criar agente ${nome ?? ''}`, (p.delete ? p.role : p.agent?.does) ?? '', p.at ?? now);
   }
   for (const c of calls) {
     if (c.state === 'pending') add('chamada', c.id, undefined, c.fromName, `${c.fromName ?? ''} → ${c.toName ?? ''}`, c.text, c.at ?? now);

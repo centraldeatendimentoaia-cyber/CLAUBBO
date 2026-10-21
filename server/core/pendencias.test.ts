@@ -49,8 +49,21 @@ describe('buildPending', () => {
     expect(l.filter((p: any) => p.urgent)).toHaveLength(1);
     expect(l[1].id).toBe('tarefa:t1');
   });
+  it('exclusão de agente é irreversível, nomeada e nunca segura; criação segue reversível', () => {
+    const l = buildPending(src({ proposals: [{ id: 'p2', state: 'pending', delete: 'ze', name: 'Zé', role: 'Financeiro', from: 'ana' }] }), now);
+    const x = l.find((p: any) => p.id === 'proposta:p2');
+    expect(x).toMatchObject({ stage: 'excluir', reversible: false, safe: false, ownerOnly: true, needsDialog: true, text: 'Financeiro' });
+    expect(x.agent).toContain('relatado pelo agente');
+    expect(buildPending(src(), now).find((p: any) => p.id === 'proposta:p1')).toMatchObject({ stage: 'criar', reversible: true, safe: false });
+    expect(classify('proposta', 'excluir').safe).toBe(false);
+  });
+  it('terminal nomeia quem pediu, marcado como dado do agente', () => {
+    const x = buildPending(src({ cliRequests: [{ id: 'r9', state: 'pending', from: 'ana', agentName: 'Priscila', text: 'oi' }] }), now).find((p: any) => p.id === 'terminal:r9');
+    expect(x.title).toContain('ana');
+    expect(x.agent).toBe('ana (relatado pelo agente)');
+  });
   it('título de exclusão e truncamento', () => {
-    const l = buildPending(src({ proposals: [{ id: 'p2', state: 'pending', delete: true, agent: { name: 'Zé' } }], calls: [{ id: 'c2', state: 'pending', text: 'y'.repeat(500), fromName: 'a'.repeat(200), toName: 'b' }] }), now);
+    const l = buildPending(src({ proposals: [{ id: 'p2', state: 'pending', delete: 'ze', name: 'Zé', role: 'Financeiro' }], calls: [{ id: 'c2', state: 'pending', text: 'y'.repeat(500), fromName: 'a'.repeat(200), toName: 'b' }] }), now);
     expect(l.find((p: any) => p.id === 'proposta:p2').title).toBe('Excluir agente Zé');
     const c = l.find((p: any) => p.id === 'chamada:c2');
     expect(c.text).toHaveLength(300);

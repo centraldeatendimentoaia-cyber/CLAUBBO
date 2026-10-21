@@ -256,7 +256,8 @@ cur = await at('implement');
 assert.match(cur.dev.stages.find((s) => s.stage === 'implement').text, /recusado=faça menor/); // o pedido do dono chega ao agente
 assert.equal((await approve(dv.task.id)).ok, true);
 await at('test');
-const fin = await approve(dv.task.id);
+const [fin, finDupla] = await Promise.all([approve(dv.task.id), approve(dv.task.id)]); // duas decisões ao mesmo tempo: só uma comita
+assert.equal(finDupla.status, 409);
 assert.ok(fin.ok && /^[0-9a-f]{7,}$/.test(fin.commit));
 assert.equal(listTasks().find((y) => y.id === dv.task.id).state, 'done');
 assert.match(gitIn('log', '-1', '--format=%s'), /^Escritório: Acrescente uma linha/);

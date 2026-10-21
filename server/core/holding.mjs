@@ -68,9 +68,29 @@ export const lotesSeguros = (pendencias) => pendencias.filter((p) => p.safe === 
  * Reconfere, logo antes de agir (e depois de cada await desde o gate), que o item continua pendente no MESMO estágio
  * classificado e que a pessoa ainda pode decidi-lo. Fecha a janela em que o estágio muda (plan -> implement) durante a espera.
  */
-export function confirmarAntesDeAgir({ pendingNow, pid, pessoa, estagio }) {
+export function confirmarAntesDeAgir({ pendingNow, pid, pessoa, estagio, decisionOf }) {
   const item = pendingNow().find((x) => x.id === pid);
+  const feito = item ? null : decisionOf?.(pid);
+  if (feito) return { ok: false, status: 409, error: `já decidido por ${feito.nome}` };
   if (!item || (item.stage ?? null) !== (estagio ?? null)) return { ok: false, status: 409, error: 'o item mudou enquanto a decisão esperava; confira de novo' };
   if (!podeDecidir(pessoa, item)) return { ok: false, status: 403, error: 'só o dono pode decidir isto' };
   return { ok: true, item };
+}
+
+/** A janela do Windows pode ser dispensada? Só para o dono pelo celular numa rota de aprovar/recusar, ou para item que não pede janela; "para sempre" nunca. */
+export function dispensaJanela({ rede, ehEscritaDoCelular, pessoa, sempre, item }) {
+  if (sempre) return false;
+  if (rede && ehEscritaDoCelular && pessoa?.papel === 'dono') return true;
+  return item?.needsDialog === false;
+}
+
+/**
+ * Entrega ao terminal: reserva o item e lembra quem decidiu SEM nenhum await no meio, para a segunda decisão não entregar de novo.
+ * `item.state` passa a 'sending' (não é mais pendente); quem entrega grava o estado final.
+ */
+export function reservarEntrega(item, pid, nome, rememberDecision, decisionOf) {
+  if (item.state !== 'pending') return { ok: false, status: 409, error: `já decidido por ${decisionOf?.(pid)?.nome ?? 'outra pessoa'}` };
+  item.state = 'sending';
+  rememberDecision(pid, nome);
+  return { ok: true };
 }
