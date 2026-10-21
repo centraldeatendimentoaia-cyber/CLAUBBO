@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { config } from './config.mjs';
 // @ts-expect-error módulo .mjs sem tipos
-import { falaDe, humorDe, registrarPartida } from './humor.mjs';
+import { falaDe, humoresDe, humorDe, registrarPartida } from './humor.mjs';
 
 const oldData = config.data;
 let dir = '';
@@ -118,5 +118,17 @@ describe('falaDe', () => {
     expect(falaDe('chateado', 'pessoa', () => 999).length).toBeGreaterThan(0);
     expect(falaDe('chateado', 'pessoa', () => -3).length).toBeGreaterThan(0);
     expect(falaDe('chateado', 'pessoa', () => NaN).length).toBeGreaterThan(0);
+  });
+});
+
+describe('humoresDe', () => {
+  it('lê o arquivo uma vez e dá o mesmo humor que humorDe', () => {
+    const t = 1_000_000;
+    registrarPartida('a', 'agente', t); registrarPartida('a', 'agente', t);
+    registrarPartida('b', 'pessoa', t); registrarPartida('b', 'pessoa', t);
+    const de = humoresDe(t + 1);
+    expect(['a', 'b', 'c'].map(de)).toEqual(['animado', 'chateado', 'neutro']);
+    expect(['a', 'b', 'c'].map((id) => humorDe(id, t + 1))).toEqual(['animado', 'chateado', 'neutro']);
+    expect(humoresDe(t + 7 * 3600e3)('a')).toBe('neutro');
   });
 });

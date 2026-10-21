@@ -32,11 +32,20 @@ export function registrarPartida(agentId, resultado, now = Date.now()) {
   writeJson(file(), d);
 }
 
-export function humorDe(agentId, now = Date.now()) {
-  const a = load().agentes[agentId];
+const humorDoRegistro = (a, now) => {
   if (!a || !a.partidas.length || now - a.at >= PRAZO) return 'neutro';
   const soma = a.partidas.reduce((s, p) => s + p, 0);
   return soma >= 2 ? 'animado' : soma <= -2 ? 'chateado' : 'neutro';
+};
+
+export function humorDe(agentId, now = Date.now()) {
+  return humorDoRegistro(load().agentes[agentId], now);
+}
+
+/** Humor de vários agentes com uma única leitura do arquivo: devolve uma função (id) => humor. */
+export function humoresDe(now = Date.now()) {
+  const { agentes } = load();
+  return (agentId) => humorDoRegistro(agentes[agentId], now);
 }
 
 // Falas fixas, sem modelo de linguagem. `geral` serve a qualquer momento; as demais, ao fim de uma partida (resultado visto do agente).

@@ -56,7 +56,7 @@ import * as xp from './core/xp.mjs';
 import { trocarModelo } from './core/modelos.mjs';
 import { criarBtw } from './core/btw.mjs';
 import { chavePessoa, extratoDe, saldoDe } from './core/carteiras.mjs';
-import { humorDe } from './core/humor.mjs';
+import { humoresDe } from './core/humor.mjs';
 import { criarJogos } from './core/jogos.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
@@ -202,6 +202,7 @@ function buildOffice(now) {
   const ids = new Set(list.map((r) => r.id));
   const meetings = inMeeting();
   const waitingTasks = listTasks().filter((t) => t.state === 'waiting');
+  const humorDe = humoresDe(now);
   const agents = loadAgents().map((a) => {
     const seed = a.seed ?? hash32(a.id);
     const home = ids.has(a.room) ? a.room : work[0].id;
@@ -227,7 +228,7 @@ function buildOffice(now) {
       id: `escritorio:${a.id}`, kind: 'main', ...(acc?.provider === 'codex' ? { provider: 'codex' } : {}), roomId, name: a.name, look: seed % 2 ? 'f' : 'm', role: a.role || 'Agente', title: a.does || undefined,
       ...(a.costume === 'reaper' || a.costume === 'jmal' ? { costume: a.costume } : {}),
       ...(a.parts || a.costume === 'reaper' ? { parts: a.parts || REAPER_PARTS } : {}), ...(a.parts ? { custom: true } : {}),
-      ...(offDuty ? { offDuty: true } : {}), ...(systemOut(a) ? { system: systemOut(a) } : {}), sessionId: a.id, account: a.account || 'principal', humor: humorDe(a.id, now), status, ...(status === 'waiting' ? { waitingFor: 'sua aprovação em Operações > Tarefas' } : {}), activity: act, recent: act ? [act] : [], tasks: [], model: a.model || undefined, startedAt: STARTED, lastEventAt: now, statusSince: now,
+      ...(offDuty ? { offDuty: true } : {}), ...(systemOut(a) ? { system: systemOut(a) } : {}), sessionId: a.id, account: a.account || 'principal', humor: humorDe(a.id), status, ...(status === 'waiting' ? { waitingFor: 'sua aprovação em Operações > Tarefas' } : {}), activity: act, recent: act ? [act] : [], tasks: [], model: a.model || undefined, startedAt: STARTED, lastEventAt: now, statusSince: now,
       stats: { toolCalls: 0, tokensIn: 0, tokensOut: 0, subagents: 0 }, seed, canMessage: true,
     };
   });
@@ -386,7 +387,7 @@ const human = async (res, what, pid, { sempre = false } = {}) => {
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
 // Cada agente do elenco ganha `obrigadoPossivel`: há resultado verificado ainda sem reconhecimento (a página só habilita o botão; quem decide é a rota).
-const comObrigado = (elenco) => { const tasks = listTasks(); return elenco.map((e) => ({ ...e, humor: humorDe(e.agent), obrigadoPossivel: !!xp.resultadoPendente(e.agent, { tasks }) })); };
+const comObrigado = (elenco) => { const tasks = listTasks(), humorDe = humoresDe(); return elenco.map((e) => ({ ...e, humor: humorDe(e.agent), obrigadoPossivel: !!xp.resultadoPendente(e.agent, { tasks }) })); };
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
 /** Quem pode decidir o item `pid`: só dono e equipe (qualquer outro papel é negado); equipe não decide o que é só do dono; item já decidido por outra pessoa dá 409. Devolve `{ stage }` (o estágio classificado, para `recheck`) ou false (já respondeu). */
 const gatePending = (req, res, pid) => {
@@ -822,6 +823,8 @@ ${logs}` : ''}`;
     return !bloqueio;
   };
   const respJogo = (res, r) => { const { status, ...resto } = r; return r.ok ? json(res, 200, resto) : json(res, status, { error: r.error }); };
+  // Falha inesperada (disco, JSON): o detalhe vai para o log do servidor, nunca para a resposta.
+  const comFalha = (res, fn) => { try { return fn(); } catch (e) { console.error('jogos:', e?.stack || e); return json(res, 500, { error: 'falha ao processar o jogo' }); } };
   const quemFez = (req) => ({ who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', status: 200 });
   if (p === '/api/carteira' && method === 'GET') {
     if (!soPessoa(res, req)) return;
@@ -831,25 +834,27 @@ ${logs}` : ''}`;
   if (p === '/api/jogos/desafio' && method === 'POST') {
     if (!soPessoa(res, req)) return;
     const body = await readBody(req);
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'corpo inválido' });
-    const r = jogos.desafiar({ pessoa: req.pessoa, agentId: body.agente, aposta: body.aposta });
-    if (r.ok) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/desafio#${r.id}` });
-    return respJogo(res, r);
+    return comFalha(res, () => {
+      const r = jogos.desafiar({ pessoa: req.pessoa, agentId: body.agente, aposta: body.aposta });
+      if (r.ok) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/desafio#${r.id}` });
+      return respJogo(res, r);
+    });
   }
   if ((m = /^\/api\/jogos\/([\w-]+)\/jogada$/.exec(p)) && method === 'POST') {
     if (!soPessoa(res, req)) return;
     const body = await readBody(req);
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'corpo inválido' });
-    const r = jogos.jogar({ pessoa: req.pessoa, id: m[1], gesto: body.gesto, rodada: body.rodada }); // o gesto não vai para a auditoria
-    if (r.ok) {
-      auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/${m[1]}/jogada` });
-      if (r.fim) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/${m[1]}/fim#${r.resultado}` });
-    }
-    return respJogo(res, r);
+    return comFalha(res, () => {
+      const r = jogos.jogar({ pessoa: req.pessoa, id: m[1], gesto: body.gesto, rodada: body.rodada }); // o gesto não vai para a auditoria
+      if (r.ok) {
+        auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/${m[1]}/jogada` });
+        if (r.fim) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/${m[1]}/fim#${r.resultado}` });
+      }
+      return respJogo(res, r);
+    });
   }
   if ((m = /^\/api\/jogos\/([\w-]+)$/.exec(p)) && method === 'GET') {
     if (!soPessoa(res, req)) return;
-    return respJogo(res, jogos.ler({ pessoa: req.pessoa, id: m[1] }));
+    return comFalha(res, () => respJogo(res, jogos.ler({ pessoa: req.pessoa, id: m[1] })));
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
