@@ -2,14 +2,13 @@
 // Fala com /api/holding da própria porta. Todo texto vindo de agente ou do servidor entra só por h()/textContent, nunca como HTML.
 // A lógica testável (atalhos, permissões, resultado das decisões) mora em holding-model.ts; aqui fica o desenho e a rede.
 import type { HoldingView, PendingItem } from '../../../shared/types';
-import { Wallets } from '../world/social/wallet';
+import { saldoDaCarteira } from '../net/interacao-api';
 import type { UiComponent, UiContext } from './context';
 import { h } from './dom';
 import {
   actionsOf, ageLabel, applyDecision, batchState, decisionOutcome, decisionUrl, focusAfterRemoval, keyAction, rotinaMarker, shortcutFor, sortPending, tabWrap, tagsOf,
   type Marcador, type Outcome,
 } from './holding-model';
-import { safeLocalStorage } from './prefs';
 
 export interface RenderOpts {
   now: number;
@@ -318,6 +317,7 @@ export class HoldingPanel implements UiComponent {
     if (this.view && document.hidden) return; // aba escondida: não consulta o servidor à toa
     let raw: string;
     let next: HoldingView;
+    const carteira = saldoDaCarteira(); // em paralelo; nunca rejeita (null = sem número)
     try {
       const res = await fetch('/api/holding');
       raw = await res.text();
@@ -338,7 +338,8 @@ export class HoldingPanel implements UiComponent {
     this.minuto = minuto;
     if (this.view) this.guardarFoco(this.view, next);
     this.view = next;
-    this.coins = (() => { const st = safeLocalStorage(); return st ? new Wallets(st).officeTotal() : null; })();
+    this.coins = await carteira; // saldo do servidor; se falhar, o número some (nunca o do navegador)
+    if (!this.root) return;
     const ids = new Set(next.pendencias.map((p) => p.id));
     for (const k of [...this.notes.keys()]) if (!ids.has(k)) this.notes.delete(k);
     for (const k of [...this.abertos]) if (!ids.has(k)) this.abertos.delete(k);

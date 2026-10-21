@@ -156,6 +156,8 @@ export interface AgentInfo {
   /** Conta de origem = AccountInfo.id (basename do config dir, ex.: ".claude", ".claude-conta2"). */
   account: string;
   status: AgentStatus;
+  /** Humor vindo dos jogos (só expressão; nunca muda tarefa, modelo ou custo). Ausente = neutro. */
+  humor?: 'animado' | 'neutro' | 'chateado';
   /** Motivo em PT-BR quando status === 'waiting'. Ex.: "aprovar uma permissão". */
   waitingFor?: string;
   /** Atividade atual (ou a mais recente). */

@@ -31,3 +31,26 @@ export async function obrigadosPossiveis(): Promise<Set<string>> {
     return new Set();
   }
 }
+
+/** GET com a mesma forma de resposta de `chamar`. */
+async function ler(url: string): Promise<Resposta> {
+  try {
+    const res = await fetch(url);
+    const corpo = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) return { ok: true, corpo };
+    return { ok: false, status: res.status, erro: typeof corpo.error === 'string' ? corpo.error : '' };
+  } catch {
+    return { ok: false, status: 0, erro: '' };
+  }
+}
+
+/** Saldo da pessoa no servidor (GET /api/carteira); null quando a chamada falha. */
+export async function saldoDaCarteira(): Promise<number | null> {
+  const r = await ler('/api/carteira');
+  return r.ok && typeof r.corpo.saldo === 'number' ? r.corpo.saldo : null;
+}
+
+// Jogo de pedra, papel e tesoura (rotas de server/bridge.mjs); o servidor decide tudo, inclusive a jogada do agente.
+export const desafiarAgente = (agente: string, aposta: number) => chamar('/api/jogos/desafio', { agente, aposta });
+export const jogarGesto = (id: string, gesto: string, rodada: number) => chamar(`/api/jogos/${encodeURIComponent(id)}/jogada`, { gesto, rodada });
+export const lerPartida = (id: string) => ler(`/api/jogos/${encodeURIComponent(id)}`);
