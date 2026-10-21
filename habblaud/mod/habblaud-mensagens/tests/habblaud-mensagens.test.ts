@@ -50,6 +50,7 @@ function world(on: On, w: World = {}) {
   mock.env(on, w.env ?? { HOME: '/home/fulano', CLAUDE_CONFIG_DIR: '~/.claude-conta2', HABBLAUD_PORT: PORT })
   const sent: Sent[] = []
   const submits: Array<{ text: string; origin: unknown }> = []
+  const commands: Array<{ command: string; args: string }> = []
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.id', () => ({ value: 'sess-1' }))
   on('session.surfaces', () => ({ value: w.surfaces ?? ['terminal'] }))
@@ -81,10 +82,15 @@ function world(on: On, w: World = {}) {
     if (fate === 'hang') await clock.sleep(60_000)
     return { text: e.text }
   })
+  on('command.run', async ($, e) => {
+    commands.push({ command: e.command, args: e.args })
+    return {}
+  })
   return {
     clock,
     sent,
     submits,
+    commands,
     inboxes: () => sent.filter((s) => s.url === INBOX_URL),
     acks: () => sent.filter((s) => s.url === ACK_URL),
     texts: () => submits.map((s) => s.text),
@@ -117,6 +123,15 @@ describe('rodadas', () => {
     await w.clock.advance(2_000)
     expect(w.sent.map((s) => s.url)).toEqual([INBOX_URL, ACK_URL, INBOX_URL])
     expect(w.submits.length).toBe(2)
+  })
+
+  test('texto que começa com / roda como comando (sem a barra), com os argumentos; o resto continua indo como prompt', async ($, on) => {
+    const w = world(on, { inbox: batches([{ id: 'c1', text: '/compact' }, { id: 'c2', text: '  /compact só o código  ' }, { id: 'p1', text: 'oi /compact' }]) })
+    await $.session.start(START)
+    await w.clock.advance(2_000)
+    expect(w.commands).toEqual([{ command: 'compact', args: '' }, { command: 'compact', args: 'só o código' }])
+    expect(w.texts()).toEqual(['oi /compact'])
+    expect(w.acks()[0]?.body).toEqual({ session: 'sess-1', results: [{ id: 'c1', ok: true }, { id: 'c2', ok: true }, { id: 'p1', ok: true }] })
   })
 
   test('recusa de um hook e exceção viram falha com o motivo; sem texto, falha sem ir para a sessão', async ($, on) => {

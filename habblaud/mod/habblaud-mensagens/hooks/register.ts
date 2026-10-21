@@ -11,7 +11,7 @@
 //    no Habblaud; 404 = uma versão sem a rota), passa a perguntar a cada 30 s até ele voltar.
 // 2. Cada mensagem, na ordem, vai para a sessão por `$.prompt.submit({ text, asUser: true })`: o modelo a lê como
 //    sua, sem o "The habblaud-mensagens plugin sent a message" (o registro da sessão ainda nomeia o plugin). O
-//    texto vai exatamente como chegou. `{drop}` (um hook recusou) ou exceção = falha, com o motivo.
+//    texto vai exatamente como chegou. Texto que começa com `/` (por exemplo /compact) é um comando: vai por `$.command.run`. `{drop}` (um hook recusou) ou exceção = falha, com o motivo.
 //    Com a sessão no meio de um turno, o Claude Code guarda o prompt até ela ficar livre e a chamada pode demorar a
 //    voltar: a espera por mensagem é de no máximo 2 s. Passou disso, a mensagem está na fila da sessão e conta
 //    como entregue, e as seguintes da mesma rodada vão em seguida, na ordem, sem esperar. Assim a rodada nunca
@@ -222,9 +222,15 @@ async function postJson($: EngineInterface, port: number, path: string, body: st
 }
 
 /** Uma mensagem para a sessão, como se você a tivesse digitado. Nunca lança. */
+/** `/nome argumentos` no começo do texto: o Claude Code recusa isso em $.prompt.submit, e o comando roda por $.command.run (nome sem a barra). */
+const SLASH = /^\/([A-Za-z0-9_:.-]+)(?:\s+([\s\S]*))?$/
+
 async function submitOne($: EngineInterface, text: string): Promise<Submitted> {
   try {
-    const r = await $.prompt.submit({ text, asUser: true })
+    const slash = SLASH.exec(text.trim())
+    const r: { drop?: unknown } | undefined = slash
+      ? await $.command.run({ command: slash[1], args: slash[2] ?? '' })
+      : await $.prompt.submit({ text, asUser: true })
     if (typeof r?.drop === 'string') return { ok: false, error: reasonText(r.drop, 'um hook da sessão recusou a mensagem') }
     return { ok: true }
   } catch (err) {
