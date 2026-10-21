@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HoldingView, PendingItem } from '../../../shared/types';
-import { actionsOf, ageLabel, agentMarker, applyDecision, batchState, canDecide, decisionOutcome, emptyKind, keyAction, shortcutFor, sortPending, tagsOf } from './holding-model';
+import { actionsOf, ageLabel, agentMarker, applyDecision, batchState, canDecide, decisionOutcome, decisionUrl, emptyKind, keyAction, rotinaMarker, shortcutFor, sortPending, tagsOf } from './holding-model';
 
 const item = (o: Partial<PendingItem> = {}): PendingItem => ({
   id: 'tarefa:t1', kind: 'tarefa', ref: 't1', stage: 'plan', agent: 'ana', title: 'Plano', text: '', since: 0, urgent: false,
@@ -121,5 +121,21 @@ describe('resultado da decisão', () => {
     const v = view([item({ id: 'a' })]);
     expect(applyDecision(v, 'a', decisionOutcome(403, 'só o dono pode decidir isto')).view.pendencias).toHaveLength(1);
     expect(applyDecision(v, 'a', decisionOutcome(500, 'falhou')).view.pendencias).toHaveLength(1);
+  });
+});
+
+describe('rotinaMarker e decisionUrl', () => {
+  it('falha de rotina é rosa, triângulo e texto; os outros estados também trazem cor, forma e texto', () => {
+    expect(rotinaMarker('falhou')).toEqual({ cor: 'rosa', forma: 'triangulo', texto: 'falhou' });
+    expect(rotinaMarker('ok').texto).toBe('rodou');
+    expect(rotinaMarker('pausada').cor).toBe('lilas');
+    expect(rotinaMarker('aguarda').forma).toBe('circulo');
+    expect(rotinaMarker('qualquer' as never).texto).toBe('parada');
+  });
+  it('rota de decisão por tipo de pedido, com a referência codificada', () => {
+    expect(decisionUrl(item({ kind: 'tarefa', ref: 't 1' }), 'aprovar')).toBe('/api/ops/tasks/t%201/approve');
+    expect(decisionUrl(item({ kind: 'terminal', ref: 'r1' }), 'recusar')).toBe('/api/cli/requests/r1/reject');
+    expect(decisionUrl(item({ kind: 'proposta', ref: 'p1' }), 'aprovar')).toBe('/api/agent-proposals/p1/approve');
+    expect(decisionUrl(item({ kind: 'chamada', ref: 'c1' }), 'recusar')).toBe('/api/agent-calls/c1/reject');
   });
 });

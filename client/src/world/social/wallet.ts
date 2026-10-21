@@ -117,6 +117,13 @@ export class Wallets {
     return this.map.get(id)?.coins ?? 0;
   }
 
+  /** Soma das moedas da economia do escritório local (sem as carteiras de visita ao mundo). */
+  officeTotal(): number {
+    let n = 0;
+    for (const [id, w] of this.map) if (partOf(id) === 'office') n += w.coins;
+    return n;
+  }
+
   /**
    * Garante a carteira do agente. Na primeira vez: saldo inicial e as tarefas que já estavam
    * concluídas pagas em silêncio (quem já trabalhou antes de a página abrir não perde o que fez).

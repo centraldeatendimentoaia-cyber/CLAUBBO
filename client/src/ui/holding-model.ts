@@ -1,5 +1,5 @@
 // Modelo puro do painel da holding (sem DOM). Todo texto vindo de agente é dado: quem renderiza usa textContent/h(), nunca HTML.
-import type { HoldingView, Papel, PendingItem } from '../../../shared/types';
+import type { HoldingView, Papel, PendingItem, RotinaEstado } from '../../../shared/types';
 
 export type Tom = 'risco' | 'neutra' | 'aviso';
 export interface Etiqueta { text: string; tone: Tom }
@@ -98,3 +98,24 @@ export function agentMarker(status: string): Marcador {
     default: return { cor: 'lilas', forma: 'quadrado', texto: 'parado' };
   }
 }
+
+/** Estado da rotina: sempre cor + forma + texto (falha = triângulo rosa). */
+export function rotinaMarker(estado: RotinaEstado): Marcador {
+  switch (estado) {
+    case 'ok': return { cor: 'lima', forma: 'quadrado', texto: 'rodou' };
+    case 'falhou': return { cor: 'rosa', forma: 'triangulo', texto: 'falhou' };
+    case 'pausada': return { cor: 'lilas', forma: 'quadrado', texto: 'pausada' };
+    case 'aguarda': return { cor: 'turquesa', forma: 'circulo', texto: 'aguarda' };
+    default: return { cor: 'lilas', forma: 'quadrado', texto: 'parada' };
+  }
+}
+
+const DECISION_BASE: Record<PendingItem['kind'], string> = {
+  tarefa: '/api/ops/tasks',
+  terminal: '/api/cli/requests',
+  proposta: '/api/agent-proposals',
+  chamada: '/api/agent-calls',
+};
+/** Rota existente que decide o pedido (as mesmas que os outros painéis usam). */
+export const decisionUrl = (p: Pick<PendingItem, 'kind' | 'ref'>, acao: 'aprovar' | 'recusar'): string =>
+  `${DECISION_BASE[p.kind]}/${encodeURIComponent(p.ref)}/${acao === 'aprovar' ? 'approve' : 'reject'}`;

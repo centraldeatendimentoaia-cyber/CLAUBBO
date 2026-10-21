@@ -11,6 +11,7 @@ import { focusPermission, nextPermissionAgent, permissionAgents } from './permis
 import { toggleBuilding } from '../world/building-view';
 import { Builder } from './builder';
 import { Ops } from './ops';
+import { HoldingPanel } from './holding';
 import { UsageCards } from './usage';
 import { VersionChip } from './version';
 
@@ -18,6 +19,9 @@ const builder = new Builder();
 const ops = new Ops();
 /** Pasta de trabalho (Escritório v2). */
 const OPS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>';
+
+/** Pilar com frontão (a holding). */
+const HOLDING_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-6 9 6"/><path d="M5 9v10M10 9v10M14 9v10M19 9v10"/><path d="M3 21h18"/></svg>';
 
 /** Abre o prédio por fora para escolher o andar (a fachada e a câmera de elevador ficam em world/building-view.ts). */
 function floorButton(): HTMLButtonElement {
@@ -65,6 +69,9 @@ export class TopBar implements UiComponent {
   private feedBtn: HTMLButtonElement;
   private timelapseBtn: HTMLButtonElement;
   readonly settingsBtn: HTMLButtonElement;
+  /** Painel da holding (pedidos que esperam o dono, rotinas, elenco); tecla H. */
+  readonly holding: HoldingPanel;
+  readonly holdingBtn: HTMLButtonElement;
   /** Abre a janela do Claubbo World (ao lado de Configurações); a janela decide quando ele aparece. */
   readonly worldBtn: HTMLButtonElement;
   private readonly spawnBtn: HTMLButtonElement;
@@ -127,6 +134,9 @@ export class TopBar implements UiComponent {
     this.worldBtn = iconButton(ICONS.city, tr('Claubbo World'), () => ctx.toggleWorld(), 'ui-btn-world');
     this.worldBtn.setAttribute('aria-haspopup', 'dialog');
     this.worldBtn.hidden = true;
+    this.holding = new HoldingPanel(ctx);
+    this.holdingBtn = iconButton(HOLDING_ICON, 'Holding: pedidos, rotinas e elenco (H)', () => this.holding.toggle(this.holdingBtn), 'ui-btn-holding');
+    this.holdingBtn.setAttribute('aria-haspopup', 'dialog');
     this.settingsBtn = iconButton(ICONS.settings, tr('Configurações'), () => ctx.toggleSettings());
     this.settingsBtn.setAttribute('aria-haspopup', 'dialog');
     this.spawnPanel = new SpawnPanel(ctx);
@@ -147,6 +157,7 @@ export class TopBar implements UiComponent {
       'div',
       { class: 'ui-btn-group', role: 'group', attrs: { 'aria-label': tr('Painéis') } },
       floorButton(),
+      this.holdingBtn,
       iconButton(OPS_ICON, 'Operações: agentes, tarefas, reuniões e contas', () => ops.toggle(), 'ui-btn-ops'),
       iconButton(BUILD_ICON, 'Construir salas e móveis', () => builder.toggle(), 'ui-btn-build'),
       this.spawnBtn,

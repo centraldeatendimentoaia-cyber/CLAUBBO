@@ -10,6 +10,7 @@ import '@fontsource/pixelify-sans/500.css';
 import '@fontsource/pixelify-sans/600.css';
 import '@fontsource/pixelify-sans/700.css';
 import './styles.css';
+import './neon.css';
 
 import type { OfficeStore } from '../net/store';
 import type { Selection, WorldApi } from '../world/api';
@@ -426,6 +427,12 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
       return;
     }
     if (isTypingTarget(e.target) || help.isOpen || worldDialog.isOpen) return;
+    if (e.key === 'h' || e.key === 'H') {
+      e.preventDefault();
+      topbar.holding.toggle(topbar.holdingBtn);
+      return;
+    }
+    if (topbar.holding.isOpen) return; // a janela da holding tem os próprios atalhos; os do escritório ficam desligados atrás dela
     switch (e.key) {
       case '/':
         e.preventDefault();
