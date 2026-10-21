@@ -46,6 +46,16 @@ Na primeira subida o servidor cria `data/acesso.json` (permissão 0600, fora dos
 - **Cabeçalhos:** toda resposta leva `Content-Security-Policy` (com `frame-ancestors 'none'`) e `X-Frame-Options: DENY`; a página não abre dentro de outra.
 - A variável `V2_CONFIRMACAO=sim|nao` pula a janela e serve só para testes; nunca use em uso real.
 
+## Painel da holding
+
+Uma página só com o que espera decisão e o que merece avaliação. Abre pelo botão da barra superior ou pela tecla `H` (fecha com `Esc` ou `H`). De cima para baixo: "Esperando você" (tarefas, pedidos a terminais, propostas e chamadas de agentes, com o risco de cada item), "Para você avaliar", os indicadores do dia (rotinas que rodaram, falhas, XP, carteira), rotinas e elenco, e o que acabou de acontecer.
+
+- **Atalhos:** `1`, `2` e `3` agem no cartão da mesma posição e `A` aprova todos os itens seguros de uma vez. Só item seguro (reversível, sem custo, sem envio de mensagem e sem confirmação no computador) aprova por tecla; nos demais a tecla apenas abre a revisão, e aprovar ou recusar exige clicar no botão.
+- **Papéis:** o dono (quem usa o computador do servidor) decide tudo e dá o "ficou bom". A equipe vê o painel e decide só o que não é exclusivo do dono; o resto aparece como "aguarda o dono" e uma tentativa direta pela API recebe 403. Se duas pessoas decidem o mesmo item, a segunda recebe 409 com o nome de quem decidiu primeiro, e a auditoria registra o nome de cada pessoa.
+- **Cadastrar pessoas:** `node scripts/equipe.mjs add <nome> [equipe|dono]` (o papel padrão é `equipe`; `list` mostra quem existe, sem tokens). O endereço com o token aparece uma única vez e `data/equipe.json` guarda só o hash. A pessoa abre o endereço no aparelho dela, na mesma rede, e o token vira cookie. Isso usa o modo celular: suba o servidor com `V2_LAN_HOST=<IP do computador no Wi-Fi>` (veja [`CELULAR.md`](CELULAR.md)) e rode o `add` com a mesma variável para o endereço sair com o IP certo. Pelo celular só se aprova e recusa; o resto é somente leitura.
+- **Janela do Windows:** aprovar item perigoso (implementação e testes de agente de código, pedidos a terminais, propostas de agentes) continua abrindo a janela de confirmação no computador do servidor, como em "Token de acesso e confirmação". Item seguro não abre janela.
+- **XP:** só por resultado verificado: o dono clica em "Ficou bom" numa tarefa concluída sem erro, ou uma rotina termina sem erro. Cada evento conta uma única vez (repetir o clique não soma) e volume de mensagens ou tokens nunca dá XP. O celular e a equipe não conseguem avaliar.
+
 ## O que mudou em relação ao Habblaud
 
 `shared/types.ts` (RoomInfo.build e floor), `client/src/world/sim/sim.ts` e `world/layout/custom-room.ts` (salas montadas, um andar por vez), `world/api.ts` (sem tema sazonal), `ui/` (construtor, operações, conversa, pedidos aos terminais, botão de andar) e `floor.ts`. O `server/` é novo; só `server/core/vendor/` é gerado a partir de `shared/` do Habblaud.
