@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { config } from './config.mjs';
 // @ts-expect-error módulo .mjs sem tipos
-import { SALDO_INICIAL, chaveAgente, chavePessoa, extratoDe, mover, saldoDe, totalGeral } from './carteiras.mjs';
+import { SALDO_INICIAL, contaDe, chaveAgente, chavePessoa, extratoDe, mover, saldoDe, totalGeral } from './carteiras.mjs';
 
 const oldData = config.data;
 let dir = '';
@@ -27,6 +27,9 @@ describe('chaves', () => {
     expect(chavePessoa(' Ana ')).toBe(chavePessoa('ana'));
     expect(chavePessoa(' Ana ')).toBe('pessoa:ana');
     expect(chaveAgente('bia')).toBe('agente:bia');
+  });
+  it('recusa nome vazio ou em branco', () => {
+    for (const n of ['', '   ', undefined, null]) expect(() => chavePessoa(n)).toThrow();
   });
 });
 
@@ -69,6 +72,48 @@ describe('mover', () => {
     mover({ id: 'p1', de: ana(), para: 'partida:1', valor: 10, texto: 'x' });
     expect(saldoDe('partida:1')).toBe(10);
     expect(mover({ id: 'p2', de: 'partida:2', para: ana(), valor: 1, texto: 'x' })).toMatchObject({ ok: false, status: 422 });
+  });
+});
+
+describe('mover: validação e limites', () => {
+  it('recusa id, origem ou destino que não sejam texto não vazio', () => {
+    for (const id of ['', 5, null, undefined]) expect(mover({ id, de: ana(), para: bia(), valor: 1, texto: 'x' })).toMatchObject({ ok: false, status: 422, error: 'dados inválidos' });
+    for (const de of ['', 7, undefined]) expect(mover({ id: 'a', de, para: bia(), valor: 1, texto: 'x' })).toMatchObject({ ok: false, status: 422, error: 'dados inválidos' });
+    for (const para of ['', {}, undefined]) expect(mover({ id: 'b', de: ana(), para, valor: 1, texto: 'x' })).toMatchObject({ ok: false, status: 422, error: 'dados inválidos' });
+    expect(saldoDe(ana())).toBe(SALDO_INICIAL);
+  });
+  it('origem igual ao destino devolve 422 sem alterar', () => {
+    expect(mover({ id: 'i1', de: ana(), para: ana(), valor: 1, texto: 'x' })).toMatchObject({ ok: false, status: 422, error: 'origem e destino iguais' });
+    expect(saldoDe(ana())).toBe(SALDO_INICIAL);
+  });
+  it('guarda só os 500 últimos ids: o mais antigo deixa de ser deduplicado, o mais novo continua', () => {
+    mover({ id: 'x0', de: ana(), para: 'partida:x', valor: 1, texto: 'x' });
+    // direções alternadas para os saldos nunca zerarem
+    for (let i = 1; i <= 500; i++) mover({ id: `y${i}`, de: i % 2 ? bia() : ana(), para: i % 2 ? ana() : bia(), valor: 1, texto: 'x' });
+    expect(mover({ id: 'y500', de: ana(), para: bia(), valor: 1, texto: 'x' })).toEqual({ ok: true, duplicado: true });
+    const antes = saldoDe(ana());
+    expect(mover({ id: 'x0', de: ana(), para: 'partida:x', valor: 1, texto: 'x' })).toEqual({ ok: true, duplicado: false });
+    expect(saldoDe(ana())).toBe(antes - 1);
+  });
+  it('ganhou e perdeu são contados junto com a movimentação, uma única vez', () => {
+    mover({ id: 'p', de: ana(), para: 'partida:g', valor: 10, texto: 'x' });
+    mover({ id: 'q', de: bia(), para: 'partida:g', valor: 10, texto: 'x' });
+    const fim = { id: 'g:fim', de: 'partida:g', para: ana(), valor: 20, texto: 'x', contar: { ganhou: ana(), perdeu: bia(), valor: 10 } };
+    expect(mover(fim)).toEqual({ ok: true, duplicado: false });
+    expect(mover(fim)).toEqual({ ok: true, duplicado: true });
+    expect(contaDe(ana())).toMatchObject({ ganhou: 10, perdeu: 0 });
+    expect(contaDe(bia())).toMatchObject({ ganhou: 0, perdeu: 10 });
+  });
+  it('contadores sobrevivem a recarregar do disco; saldo corrompido vira 0', () => {
+    mover({ id: 'p', de: ana(), para: 'partida:g', valor: 10, texto: 'x' });
+    mover({ id: 'g:fim', de: 'partida:g', para: bia(), valor: 10, texto: 'x', contar: { ganhou: bia(), perdeu: ana(), valor: 5 } });
+    const f = path.join(dir, 'carteiras.json');
+    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+    d.contas['pessoa:zé'] = { saldo: 'lixo' };
+    fs.writeFileSync(f, JSON.stringify(d));
+    expect(saldoDe('pessoa:zé')).toBe(0);
+    expect(contaDe(bia()).ganhou).toBe(5);
+    expect(contaDe(ana()).perdeu).toBe(5);
   });
 });
 

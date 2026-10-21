@@ -13,13 +13,21 @@ const limpo = (o) => Object.assign(Object.create(null), o);
 const load = () => {
   const d = readJson(file(), null);
   const contas = limpo(d?.contas);
-  for (const k of Object.keys(contas)) contas[k] = { saldo: contas[k].saldo, extrato: contas[k].extrato ?? [] };
+  // Dado corrompido vira zero em vez de espalhar NaN pelas somas.
+  for (const k of Object.keys(contas)) {
+    const c = contas[k];
+    contas[k] = { saldo: Number(c?.saldo) || 0, ganhou: Number(c?.ganhou) || 0, perdeu: Number(c?.perdeu) || 0, extrato: Array.isArray(c?.extrato) ? c.extrato : [] };
+  }
   return { contas, movimentos: Array.isArray(d?.movimentos) ? d.movimentos : [] };
 };
 // Abre a conta se ainda não existe (só pessoa e agente recebem o saldo inicial).
-const conta = (d, chave) => (d.contas[chave] ??= { saldo: /^(pessoa|agente):/.test(chave) ? SALDO_INICIAL : 0, extrato: [] });
+const conta = (d, chave) => (d.contas[chave] ??= { saldo: /^(pessoa|agente):/.test(chave) ? SALDO_INICIAL : 0, ganhou: 0, perdeu: 0, extrato: [] });
 
-export const chavePessoa = (nome) => `pessoa:${String(nome).trim().toLowerCase()}`;
+export function chavePessoa(nome) {
+  const n = typeof nome === 'string' ? nome.trim().toLowerCase() : '';
+  if (!n) throw new Error('nome da pessoa vazio');
+  return `pessoa:${n}`;
+}
 export const chaveAgente = (id) => `agente:${id}`;
 
 export function saldoDe(chave) {
@@ -30,6 +38,12 @@ export function saldoDe(chave) {
   return saldo;
 }
 
+/** Cópia da conta: saldo e contadores `ganhou`/`perdeu` (sem criar a conta). */
+export function contaDe(chave) {
+  const c = load().contas[chave];
+  return c ? { saldo: c.saldo, ganhou: c.ganhou, perdeu: c.perdeu } : { saldo: 0, ganhou: 0, perdeu: 0 };
+}
+
 export function extratoDe(chave) {
   return [...(load().contas[chave]?.extrato ?? [])].reverse();
 }
@@ -37,8 +51,13 @@ export function extratoDe(chave) {
 /** Soma de todas as contas: nas partidas ela só muda quando uma conta nova de pessoa/agente nasce. */
 export const totalGeral = () => Object.values(load().contas).reduce((s, c) => s + c.saldo, 0);
 
-/** Move `valor` de `de` para `para` uma única vez por `id`. Síncrono de ponta a ponta: não há await entre conferir e gravar. */
-export function mover({ id, de, para, valor, texto }, now = Date.now()) {
+/**
+ * Move `valor` de `de` para `para` uma única vez por `id`. Síncrono de ponta a ponta: não há await entre conferir e gravar.
+ * `contar` ({ ganhou, perdeu, valor }) soma os contadores das duas contas na mesma gravação, também uma única vez por `id`.
+ */
+export function mover({ id, de, para, valor, texto, contar }, now = Date.now()) {
+  const txt = (s) => typeof s === 'string' && s !== '';
+  if (!txt(id) || !txt(de) || !txt(para)) return { ok: false, status: 422, error: 'dados inválidos' };
   const d = load();
   if (d.movimentos.includes(id)) return { ok: true, duplicado: true };
   if (!Number.isInteger(valor) || valor <= 0) return { ok: false, status: 422, error: 'valor inválido' };
@@ -49,6 +68,10 @@ export function mover({ id, de, para, valor, texto }, now = Date.now()) {
   destino.saldo += valor;
   origem.extrato = [...origem.extrato, { at: now, delta: -valor, texto }].slice(-MAX_EXTRATO);
   destino.extrato = [...destino.extrato, { at: now, delta: valor, texto }].slice(-MAX_EXTRATO);
+  if (contar && Number.isInteger(contar.valor) && contar.valor > 0) {
+    if (txt(contar.ganhou)) conta(d, contar.ganhou).ganhou += contar.valor;
+    if (txt(contar.perdeu)) conta(d, contar.perdeu).perdeu += contar.valor;
+  }
   d.movimentos = [...d.movimentos, id].slice(-MAX_MOVIMENTOS);
   writeJson(file(), d);
   return { ok: true, duplicado: false };
