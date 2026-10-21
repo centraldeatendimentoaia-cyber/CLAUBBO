@@ -48,6 +48,7 @@ import { MAX_FILE, openById, saveFile } from './core/entregas.mjs';
 import { inService } from './core/hours.mjs';
 import { cleanFolder, cleanSystem, stripSystem } from './core/system-config.mjs';
 import { IPV4, PHONE_WRITES, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
+import { loadTeam } from './core/equipe.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
@@ -484,7 +485,8 @@ async function route(req, res, url) {
     const role = fromNetwork(req) ? 'celular' : roleOf(req, access, PORT); // rede: o phoneGate já exigiu o cookie do QR code e só deixa aprovar/recusar
     if (!role) return json(res, 403, { error: 'token de acesso ausente ou inválido: recarregue a página do Escritório' });
     if (role === 'agentes' && !(method === 'POST' && AGENT_ROUTES.test(p))) return json(res, 403, { error: 'o token dos agentes só vale para criar pedidos e propostas' });
-    if (shouldAudit(method, p)) res.on('finish', () => auditRecord(config.data, { who: role, method, path: p, status: res.statusCode }));
+    if (role === 'agentes') req.pessoa = { nome: 'agentes', papel: 'agente' };
+    if (shouldAudit(method, p)) res.on('finish', () => auditRecord(config.data, { who: role, nome: req.pessoa?.nome, method, path: p, status: res.statusCode }));
   }
 
   // ---- permissões pedidas por terminais do Claude Code (andar 2): quem decide é a página, a entrega é do Claubbo original
@@ -1018,10 +1020,11 @@ export function start() {
     try {
       const url = new URL(req.url, 'http://x');
       if (fromNetwork(req)) { // celular na mesma rede: só leitura e só com o token do QR code
-        const gate = phoneGate(req, url, PHONE_TOKEN, PORT);
+        const gate = phoneGate(req, url, PHONE_TOKEN, PORT, loadTeam(config.data)); // arquivo pequeno: lido a cada pedido de rede, então um cadastro novo vale sem reiniciar
         if (gate.action === 'deny') return json(res, gate.status, { error: gate.error });
         if (gate.action === 'redirect') { res.writeHead(302, { location: gate.location, 'set-cookie': gate.cookie, 'cache-control': 'no-store' }); return res.end(); }
-      }
+        req.pessoa = gate.person;
+      } else req.pessoa = { nome: 'dono', papel: 'dono' }; // local: o computador do servidor (sem token válido, a rota devolve 403)
       if (!url.pathname.startsWith('/api/')) return serveStatic(req, res, url);
       route(req, res, url).catch((e) => { if (!res.headersSent) json(res, statusOf(e), { error: String(e.message || e) }); else res.destroy(); });
     } catch { if (!res.headersSent) json(res, 400, { error: 'endereço inválido' }); else res.destroy(); } // URL ou %-escape malformado

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { IPV4, hostAllowed, isLoopback, newPhoneToken, phoneGate } from './acesso.mjs';
@@ -71,6 +72,31 @@ describe('modo celular', () => {
   it('aprovar sem cookie é negado, e o token na URL não vale para escrita', () => {
     expect(phoneGate(req('POST'), url('/api/ops/tasks/abc/approve'), TOKEN, 4530).action).toBe('deny');
     expect(phoneGate(req('POST'), url(`/api/ops/tasks/abc/approve?t=${TOKEN}`), TOKEN, 4530).action).toBe('deny');
+  });
+
+  describe('token de pessoa', () => {
+    const ANA = 'a'.repeat(64);
+    const team = { pessoas: [{ nome: 'Ana', papel: 'equipe', hash: crypto.createHash('sha256').update(ANA).digest('hex') }] };
+
+    it('com o cookie da pessoa libera a leitura como equipe', () => {
+      expect(phoneGate(req('GET', `v2_cel_4530=${ANA}`), url('/api/snapshot'), TOKEN, 4530, team)).toEqual({ action: 'allow', person: { nome: 'Ana', papel: 'equipe' } });
+    });
+
+    it('na primeira visita grava o cookie com o token da pessoa', () => {
+      const g = phoneGate(req('GET'), url(`/?t=${ANA}`), TOKEN, 4530, team);
+      expect(g).toMatchObject({ action: 'redirect', location: '/' });
+      expect(g.cookie).toContain(`v2_cel_4530=${ANA}`);
+    });
+
+    it('token desconhecido é negado, e o do QR code segue valendo como dono', () => {
+      expect(phoneGate(req('GET', `v2_cel_4530=${'b'.repeat(64)}`), url('/'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+      expect(phoneGate(req('GET', `v2_cel_4530=${TOKEN}`), url('/'), TOKEN, 4530, team)).toEqual({ action: 'allow', person: { nome: 'celular', papel: 'dono' } });
+    });
+
+    it('pessoa da equipe só escreve aprovando ou recusando', () => {
+      expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/chat'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+      expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/ops/tasks/abc/approve'), TOKEN, 4530, team).action).toBe('allow');
+    });
   });
 
   it('sem token configurado nada passa', () => {

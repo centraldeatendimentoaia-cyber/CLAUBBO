@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { personByToken } from './equipe.mjs';
 
 export const ACCESS_FILE = 'acesso.json';
 const TOKEN = /^[0-9a-f]{64}$/;
@@ -67,19 +68,23 @@ export const newPhoneToken = () => crypto.randomBytes(24).toString('hex');
 /** Única escrita que o celular faz: aprovar ou recusar (tarefas, pedidos de terminal, propostas e chamadas de agentes, permissões). */
 export const PHONE_WRITES = /^\/api\/(?:ops\/tasks|cli\/requests|agent-proposals|agent-calls)\/[^/]+\/(?:approve|reject)$|^\/api\/permissions\/[^/]+\/decision$/;
 
+const CELULAR = { nome: 'celular', papel: 'dono' };
+
 /** Decide uma requisição que veio da rede: 'deny' (com motivo), 'redirect' (primeira visita, grava o cookie e tira o token da URL) ou 'allow'. */
-export function phoneGate(req, url, token, port) {
+export function phoneGate(req, url, token, port, team) {
   const read = req.method === 'GET' || req.method === 'HEAD';
   const writeAll = process.env.V2_CELULAR_ESCRITA === '1'; // opt-in: o celular escreve como a página (só aprovar e recusar dispensam o "sim" no computador)
   if (!read && !writeAll && !(req.method === 'POST' && PHONE_WRITES.test(url.pathname))) return { action: 'deny', status: 403, error: 'celular: só aprovar e recusar; o resto é somente leitura' };
   const given = read ? url.searchParams.get('t') : null; // escrita só vale com o cookie, nunca com o token na URL
-  if (given && token && same(given, token)) {
+  const who = (t) => (t && token && same(t, token) ? CELULAR : personByToken(team, t)); // o token do QR code vale como dono; o de uma pessoa, com o papel dela
+  if (who(given)) {
     url.searchParams.delete('t');
     const clean = url.pathname + (url.search || '');
-    return { action: 'redirect', location: clean, cookie: `${phoneCookieName(port)}=${token}; HttpOnly; SameSite=Strict; Path=/` };
+    return { action: 'redirect', location: clean, cookie: `${phoneCookieName(port)}=${given}; HttpOnly; SameSite=Strict; Path=/` };
   }
   const cookie = readCookie(req, phoneCookieName(port));
-  if (cookie && token && same(cookie, token)) return { action: 'allow' };
+  const person = who(cookie);
+  if (person) return { action: 'allow', person };
   return { action: 'deny', status: 403, error: 'celular: abra o endereço pelo QR code mostrado no computador' };
 }
 
