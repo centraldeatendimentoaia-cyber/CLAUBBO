@@ -10,3 +10,4 @@ JMAL/
 *.log
 .vitest/
 .superpowers/
+tsconfig.tsbuildinfo

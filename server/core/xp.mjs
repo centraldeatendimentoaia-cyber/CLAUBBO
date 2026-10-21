@@ -23,6 +23,8 @@ export function award(key, agent, pontos, now = Date.now()) {
   if (d.eventos[key]) return { ok: true, duplicado: true };
   d.eventos[key] = { agent, pontos, at: now };
   d.agentes[agent] = (d.agentes[agent] ?? 0) + pontos;
+  // Poda: eventos com mais de 30 dias saem; os "bom:" ficam (são a trava de avaliação em dobro). O total dos agentes não muda.
+  for (const [k, e] of Object.entries(d.eventos)) if (!k.startsWith('bom:') && e.at < now - 30 * 86400e3) delete d.eventos[k];
   writeJson(file(), d);
   return { ok: true, duplicado: false };
 }
@@ -37,6 +39,15 @@ export function levelOf(xp) {
 
 export const xpOf = (agent) => load().agentes[agent] ?? 0;
 export const xpHoje = (now = Date.now()) => Object.values(load().eventos).filter((e) => diaSP(e.at) === diaSP(now)).reduce((s, e) => s + e.pontos, 0);
+/** Um retrato do XP lido uma única vez (o painel consulta várias tarefas por pedido). */
+export function lerXp() {
+  const d = load();
+  return {
+    elenco: () => Object.entries(d.agentes).map(([agent, xp]) => ({ agent, xp, ...levelOf(xp) })),
+    xpHoje: (now = Date.now()) => Object.values(d.eventos).filter((e) => diaSP(e.at) === diaSP(now)).reduce((s, e) => s + e.pontos, 0),
+    avaliada: (taskId) => !!d.eventos[`bom:${taskId}`],
+  };
+}
 /** A tarefa já recebeu o "ficou bom"? */
 export const avaliada = (taskId) => !!load().eventos[`bom:${taskId}`];
 export const elenco = () => Object.entries(load().agentes).map(([agent, xp]) => ({ agent, xp, ...levelOf(xp) }));

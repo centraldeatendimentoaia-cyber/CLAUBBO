@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { config } from './config.mjs';
 // @ts-expect-error módulo .mjs sem tipos
-import { avaliada, award, elenco, ficouBom, levelOf, xpHoje, xpOf } from './xp.mjs';
+import { avaliada, award, elenco, ficouBom, lerXp, levelOf, xpHoje, xpOf } from './xp.mjs';
 // @ts-expect-error módulo .mjs sem tipos
 import { recordHistory } from './routines.mjs';
 
@@ -118,5 +118,28 @@ describe('ficouBom', () => {
     expect(ficouBom(args({ taskId: { $ne: 1 } })).status).toBe(404);
     expect(ficouBom(args({ tasks: [tarefa({ agent: 'sumiu' })] })).status).toBe(404);
     expect(xpOf('ana')).toBe(0);
+  });
+});
+
+describe('lerXp e poda (M3)', () => {
+  it('lê o arquivo uma vez: o retrato não muda com concessões posteriores', () => {
+    award('bom:t1', 'ana', 30, Date.now());
+    const x = lerXp();
+    award('bom:t2', 'ana', 30, Date.now());
+    expect(x.avaliada('t1')).toBe(true);
+    expect(x.avaliada('t2')).toBe(false);
+    expect(x.elenco()[0].xp).toBe(30);
+    expect(x.xpHoje()).toBe(30);
+  });
+  it('poda eventos com mais de 30 dias, mantém os bom: e o total dos agentes', () => {
+    const DIA = 86400e3, agora = Date.now();
+    award('rotina:velha', 'ana', 5, agora - 40 * DIA);
+    award('bom:velha', 'ana', 30, agora - 40 * DIA);
+    award('rotina:nova', 'ana', 5, agora);
+    expect(xpOf('ana')).toBe(40);
+    expect(avaliada('velha')).toBe(true);
+    expect(lerXp().xpHoje(agora)).toBe(5);
+    const eventos = JSON.parse(fs.readFileSync(path.join(dir, 'xp.json'), 'utf8')).eventos;
+    expect(Object.keys(eventos).sort()).toEqual(['bom:velha', 'rotina:nova']);
   });
 });

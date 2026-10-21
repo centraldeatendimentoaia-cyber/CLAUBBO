@@ -91,6 +91,13 @@ describe('painel da holding (renderer)', () => {
     expect(el.textContent).toContain('falhou');
   });
 
+  it('indicador de rotinas é rodaram/(rodaram+falharam+previstas) e a carteira se chama moedas do escritório', async () => {
+    const { el } = await render(view({ rotinas: { rodaram: 1, falharam: 1, previstas: 2, lista: [] } }));
+    expect(el.textContent).toContain('1/4');
+    expect(el.textContent).toContain('MOEDAS DO ESCRITÓRIO');
+    expect(el.textContent).not.toContain('CARTEIRA');
+  });
+
   it('sem rotinas mostra o estado vazio', async () => {
     const { el } = await render(view());
     expect(el.textContent).toContain('Nenhuma rotina');

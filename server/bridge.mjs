@@ -765,7 +765,7 @@ ${logs}` : ''}`;
     }
   }
   if (p === '/api/holding' && method === 'GET') {
-    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp }), papel: req.pessoa.papel });
+    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xp.lerXp() }), papel: req.pessoa.papel });
   }
   if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: xp.elenco(), xpHoje: xp.xpHoje() });
   if (p === '/api/xp/ficou-bom' && method === 'POST') {

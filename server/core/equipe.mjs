@@ -8,6 +8,8 @@ const NOME = /^[\p{L}\p{N} ._-]{1,40}$/u;
 const PAPEIS = ['dono', 'equipe'];
 const RESERVADOS = ['dono', 'celular', 'agentes']; // identidades do sistema na auditoria: ninguém da equipe pode usá-las
 const chave = (nome) => String(nome ?? '').trim().normalize('NFKC').toLowerCase();
+// Só letras e dígitos: "d.o-n_o" vira "dono", então não escapa da lista de reservados.
+const soAlfanum = (nome) => chave(nome).replace(/[^\p{L}\p{N}]/gu, '');
 const valida = (p) => NOME.test(p?.nome) && PAPEIS.includes(p?.papel) && /^[0-9a-f]{64}$/.test(p?.hash);
 const sha = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
@@ -34,16 +36,30 @@ export function addPerson(dataDir, nome, papel) {
   nome = String(nome ?? '').trim().normalize('NFKC');
   if (!NOME.test(nome)) return { error: 'nome inválido: use de 1 a 40 letras, números, espaço, ponto, hífen ou sublinhado' };
   if (!PAPEIS.includes(papel)) return { error: 'papel inválido: use dono ou equipe' };
-  if (RESERVADOS.includes(chave(nome))) return { error: `${nome} é um nome reservado do sistema` };
+  if (RESERVADOS.includes(soAlfanum(nome))) return { error: `${nome} é um nome reservado do sistema` };
   const pessoas = readStrict(dataDir);
   if (pessoas.some((p) => chave(p.nome) === chave(nome))) return { error: `já existe uma pessoa chamada ${nome}` };
   const token = crypto.randomBytes(32).toString('hex');
+  gravar(dataDir, [...pessoas, { nome, papel, hash: sha(token) }]);
+  return { token };
+}
+
+/** Gravação atômica, modo 0600. */
+function gravar(dataDir, pessoas) {
   const file = path.join(dataDir, TEAM_FILE);
   fs.mkdirSync(dataDir, { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ pessoas: [...pessoas, { nome, papel, hash: sha(token) }] }, null, 2), { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify({ pessoas }, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, file);
-  return { token };
+}
+
+/** Revoga uma pessoa (o token dela para de valer na hora). Só tira a linha dela; arquivo estragado lança e nada é regravado. */
+export function removePerson(dataDir, nome) {
+  const pessoas = readStrict(dataDir);
+  const resto = pessoas.filter((p) => chave(p.nome) !== chave(nome));
+  if (resto.length === pessoas.length) return { error: `${String(nome).trim()} não existe na equipe` };
+  gravar(dataDir, resto);
+  return { ok: true };
 }
 
 /** Quem é o dono deste token, ou null. Compara os hashes em tempo constante. */

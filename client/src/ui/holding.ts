@@ -126,10 +126,10 @@ export function renderHolding(v: HoldingView, o: RenderOpts): HTMLElement {
   const faixa = h(
     'section',
     { class: 'hold-strip', attrs: { 'aria-label': 'Indicadores' } },
-    kpi(`${r.rodaram}/${r.previstas}`, 'ROTINAS DE HOJE', 'lima'),
+    kpi(`${r.rodaram}/${r.rodaram + r.falharam + r.previstas}`, 'ROTINAS DE HOJE', 'lima'),
     kpi(String(r.falharam), r.falharam ? `${tipo(r.falharam, 'FALHOU', 'FALHARAM')} · ${falhas.map((f) => f.title).join(', ').toUpperCase()}` : 'FALHAS', r.falharam ? 'rosa' : 'lilas', r.falharam ? h('span', { class: 'hold-forma hold-forma--triangulo hold-cor--rosa', attrs: { 'aria-hidden': 'true' } }) : undefined),
     kpi(`+${v.xpHoje ?? 0}`, 'XP DO ELENCO HOJE', 'turquesa'),
-    kpi(o.coins === null ? '—' : `🪙 ${o.coins}`, 'SUA CARTEIRA', 'amarelo'),
+    kpi(o.coins === null ? '—' : `🪙 ${o.coins}`, 'MOEDAS DO ESCRITÓRIO', 'amarelo'),
   );
 
   const lista = [...r.lista].sort((a, b) => Number(b.estado === 'falhou') - Number(a.estado === 'falhou'));
@@ -445,4 +445,3 @@ export class HoldingPanel implements UiComponent {
     await this.load();
   }
 }
-
