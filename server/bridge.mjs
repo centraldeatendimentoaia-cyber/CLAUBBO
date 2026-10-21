@@ -10,7 +10,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { config } from './core/config.mjs';
-import { createAccount, dirOf, listAccounts, openClaudeTerminal, removeAccount, startLogin } from './core/accounts.mjs';
+import { createAccount, dirOf, getAccount, listAccounts, openClaudeTerminal, removeAccount, startLogin } from './core/accounts.mjs';
 import { recentActivity } from './core/activity.mjs';
 import { normalize as normalizeAgent, createAgent, deleteAgent, getAgent, loadAgents, updateAgent } from './core/agents.mjs';
 import { listSkills, systemFor } from './core/brain.mjs';
@@ -53,6 +53,7 @@ import { buildPending, decisionOf, rememberDecision } from './core/pendencias.mj
 import { buildHolding, confirmarAntesDeAgir, dispensaJanela, lotesSeguros, podeDecidir, reservarEntrega } from './core/holding.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import * as xp from './core/xp.mjs';
+import { trocarModelo } from './core/modelos.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -774,6 +775,16 @@ ${logs}` : ''}`;
     // Nada assíncrono depois do corpo: a tarefa é lida do servidor e o XP é concedido na mesma passada síncrona.
     const r = xp.ficouBom({ pessoa: req.pessoa, taskId: body?.task, tasks: listTasks(), getAgent });
     return r.ok ? json(res, 200, { ok: true, duplicado: r.duplicado, agent: r.agent, xp: r.xp }) : json(res, r.status, { error: r.error });
+  }
+  if ((m = /^\/api\/agentes\/([^/]+)\/modelo$/.exec(p)) && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode trocar o modelo' });
+    const body = await readBody(req);
+    // Nada assíncrono depois do corpo: conferir `de` e gravar acontecem na mesma passada síncrona.
+    const r = trocarModelo({ pessoa: req.pessoa, id: m[1], direcao: body?.direcao, de: body?.de, getAgent, updateAgent, providerReal: (a) => getAccount(a.account)?.provider });
+    if (!r.ok) return json(res, r.status, { error: r.error });
+    auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/modelo#${r.de}->${r.para}`, status: 200 });
+    pollSoon();
+    return json(res, 200, { ok: true, de: r.de, para: r.para, agent: r.agent });
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });

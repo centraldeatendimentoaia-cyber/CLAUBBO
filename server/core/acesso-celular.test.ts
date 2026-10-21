@@ -105,6 +105,13 @@ describe('modo celular', () => {
       expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/ops/tasks/abc/approve'), TOKEN, 4530, team).action).toBe('allow');
     });
 
+    it('rotas de agentes (modelo, obrigado, btw): equipe passa; token inválido e PUT de agente não', () => {
+      expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/agentes/x/modelo'), TOKEN, 4530, team).action).toBe('allow');
+      expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/agentes/x/btw'), TOKEN, 4530, team).action).toBe('allow');
+      expect(phoneGate(req('POST', `v2_cel_4530=${'b'.repeat(64)}`), url('/api/agentes/x/modelo'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+      expect(phoneGate(req('PUT', `v2_cel_4530=${ANA}`), url('/api/agentes/x'), TOKEN, 4530, team).action).toBe('deny');
+    });
+
     it('com V2_CELULAR_ESCRITA=1 só o token do dono escreve fora de aprovar/recusar; a equipe nunca (I2)', () => {
       process.env.V2_CELULAR_ESCRITA = '1';
       try {

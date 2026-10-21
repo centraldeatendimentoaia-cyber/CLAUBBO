@@ -28,3 +28,22 @@ export function proximo(agent, direcao) {
   }
   return { ok: true, de: agent.model, para: d.escada[alvo] };
 }
+
+/**
+ * Troca o modelo de um agente um degrau acima ou abaixo. Toda a lógica fica aqui; a rota só audita.
+ * Síncrona de ponta a ponta: conferir `de` e gravar acontecem na mesma passada, então dois cliques com o mesmo `de` não passam os dois.
+ * `providerReal(agent)` devolve o provider da conta (account.provider) para contas Codex com id fora da convenção.
+ */
+export function trocarModelo({ pessoa, id, direcao, de, getAgent, updateAgent, providerReal = () => undefined }) {
+  if (!pessoa?.nome || (pessoa.papel !== 'dono' && pessoa.papel !== 'equipe')) return { ok: false, status: 403, error: 'sem permissão para trocar o modelo' };
+  if (direcao !== 'subir' && direcao !== 'descer') return { ok: false, status: 400, error: 'direção inválida' };
+  const agent = getAgent(id);
+  if (!agent) return { ok: false, status: 404, error: 'agente não encontrado' };
+  if (agent.model !== de) return { ok: false, status: 409, error: `o modelo atual é "${agent.model ?? ''}", não "${de ?? ''}"` };
+  const provider = providerReal(agent);
+  const r = proximo(provider ? { ...agent, provider } : agent, direcao);
+  if (!r.ok) return r;
+  const u = updateAgent(id, { model: r.para });
+  if (!u.ok) return { ok: false, status: u.status ?? 400, error: (u.errors ?? ['não foi possível gravar']).join('; ') };
+  return { ok: true, status: 200, de: r.de, para: r.para, agent: u.agent };
+}
