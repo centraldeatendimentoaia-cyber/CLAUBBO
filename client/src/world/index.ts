@@ -539,6 +539,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     if (e.key === 'Shift') playerShift = down;
     else if (typeof e.getModifierState === 'function') playerShift = e.getModifierState('Shift');
     const k = moveKeyOf(e);
+    // Shift apertado com a seta já segurada também muda a intenção: a seta presa não repete o keydown.
+    if (e.key === 'Shift' && down) pushPlayerIntent();
     if (!down) {
       if (k) playerKeys.delete(k);
       pushPlayerIntent();
