@@ -177,6 +177,15 @@ describe('agradecer', () => {
     const tasks = [tarefa({ id: 'velha', doneAt: 1 }), tarefa({ id: 'nova', doneAt: 9 })];
     expect(resultadoPendente('ana', { tasks, rotinas: [] })).toEqual({ id: 'nova', tipo: 'tarefa' });
   });
+  it('várias concluídas sem reconhecimento: só a mais recente rende; depois de uma nova volta a ser possível', () => {
+    const tasks = [tarefa({ id: 'a', doneAt: 1 }), tarefa({ id: 'b', doneAt: 2 }), tarefa({ id: 'c', doneAt: 3 })];
+    expect(agradecer(args({ tasks }))).toMatchObject({ ok: true, id: 'c' });
+    expect(agradecer(args({ tasks }))).toMatchObject({ ok: false, status: 409 });
+    expect(agradecer(args({ tasks, pessoa: dono }))).toMatchObject({ ok: false, status: 409, error: 'já agradecido por Bia' });
+    expect(xpOf('ana')).toBe(XP_OBRIGADO);
+    expect(agradecer(args({ tasks: [...tasks, tarefa({ id: 'd', doneAt: 4 })] }))).toMatchObject({ ok: true, id: 'd' });
+    expect(xpOf('ana')).toBe(2 * XP_OBRIGADO);
+  });
   it('403 sem nome ou sem papel; 404 agente inexistente', () => {
     for (const pessoa of [{ papel: 'equipe' }, { papel: 'agente', nome: 'x' }, undefined]) {
       expect(agradecer(args({ pessoa }))).toMatchObject({ ok: false, status: 403 });

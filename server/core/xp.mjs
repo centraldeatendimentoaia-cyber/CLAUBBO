@@ -68,7 +68,7 @@ export function ficouBom({ pessoa, taskId, tasks, getAgent }) {
 }
 
 /**
- * Resultado verificado mais recente do agente que ainda não foi reconhecido (sem `bom:` nem `obrigado:`).
+ * Resultado verificado mais recente do agente, se ainda não foi reconhecido (sem `bom:` nem `obrigado:`); senão null.
  * Vale tarefa concluída sem erro; `rotinas` são as execuções de rotina (mesmo formato de tarefa), sem repetir o que já está em `tasks`.
  */
 export function resultadoPendente(agentId, { tasks = [], rotinas = [] } = {}) {
@@ -82,12 +82,13 @@ export function resultadoPendente(agentId, { tasks = [], rotinas = [] } = {}) {
       candidatos.push({ id: t.id, tipo: tipo ?? (t.routine ? 'rotina' : 'tarefa'), doneAt: t.doneAt ?? 0 });
     }
   }
-  const livres = candidatos.filter((c) => !eventos[`bom:${c.id}`] && !eventos[`obrigado:${c.id}`]).sort((a, b) => b.doneAt - a.doneAt);
-  return livres[0] ? { id: livres[0].id, tipo: livres[0].tipo } : null;
+  // Só o mais recente é agradecível: se ele já foi reconhecido, tarefas antigas não voltam a render XP.
+  const recente = candidatos.sort((x, y) => y.doneAt - x.doneAt)[0];
+  return recente && !eventos[`bom:${recente.id}`] && !eventos[`obrigado:${recente.id}`] ? { id: recente.id, tipo: recente.tipo } : null;
 }
 
 /**
- * Agradecer ao agente pelo resultado mais recente ainda não reconhecido. Dono ou equipe com nome. O resultado é escolhido aqui,
+ * Agradecer ao agente pelo resultado mais recente se ainda não reconhecido. Dono ou equipe com nome. O resultado é escolhido aqui,
  * nunca pela página. A chave `obrigado:<id>` é única: quem agradece primeiro leva o XP e os demais recebem 409.
  */
 export function agradecer({ pessoa, agentId, tasks = [], rotinas = [], getAgent }) {
