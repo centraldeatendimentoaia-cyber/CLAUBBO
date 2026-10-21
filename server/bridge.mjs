@@ -49,6 +49,8 @@ import { inService } from './core/hours.mjs';
 import { cleanFolder, cleanSystem, stripSystem } from './core/system-config.mjs';
 import { IPV4, PHONE_WRITES, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
 import { loadTeam } from './core/equipe.mjs';
+import { buildPending, decisionOf, rememberDecision } from './core/pendencias.mjs';
+import { buildHolding, lotesSeguros, podeDecidir } from './core/holding.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
@@ -363,7 +365,23 @@ let access = null; // tokens da instalação (data/acesso.json), lidos na subida
 const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-calls)$/;
 /** Pede o "sim" de uma pessoa diante do computador (janela do Windows). Recusado: já responde o erro e devolve false. */
 /** Vindo do celular (já passou pelo token do QR code) numa rota de aprovar/recusar, quem decide é a pessoa no celular: não abre a janela. Qualquer outra escrita do celular ainda pede o "sim" no computador. */
-const human = async (res, what) => { const r = fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
+/** Com `pid` (id da pendência), a janela só abre se o item pedir (needsDialog); item desconhecido sempre abre. Sem `pid`, sempre abre. */
+const human = async (res, what, pid) => { const r = (fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname)) || (pid && pendingNow().find((x) => x.id === pid)?.needsDialog === false) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
+// XP ainda não existe (Task 4 troca isto pelo módulo real): nada a avaliar, elenco vazio.
+const xpStub = { elenco: () => [], xpHoje: () => 0, avaliada: () => true };
+const TICKER_LIDO = 12;
+/** Tudo que espera decisão agora, com o risco de cada item. */
+const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
+/** Quem pode decidir o item `pid`: só dono e equipe (qualquer outro papel é negado); equipe não decide o que é só do dono; item já decidido por outra pessoa dá 409. false = já respondeu. */
+const gatePending = (req, res, pid) => {
+  const papel = req.pessoa?.papel;
+  if (papel !== 'dono' && papel !== 'equipe') { json(res, 403, { error: 'sem permissão para decidir' }); return false; }
+  const item = pendingNow().find((x) => x.id === pid);
+  if (item && !podeDecidir(req.pessoa, item)) { json(res, 403, { error: 'só o dono pode decidir isto' }); return false; }
+  const feito = item ? null : decisionOf(pid);
+  if (feito) { json(res, 409, { error: `já decidido por ${feito.nome}` }); return false; }
+  return true;
+};
 /** Cadastro/troca do sistema de um agente: valida e mostra ao João o comando JÁ normalizado e a pasta. false = já respondeu. */
 const gateSystem = async (res, body, who) => {
   if (body.system === undefined) return true;
@@ -734,12 +752,37 @@ ${logs}` : ''}`;
       return r.ok ? json(res, 200, r) : fail(res, r);
     }
   }
+  if (p === '/api/holding' && method === 'GET') {
+    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xpStub }), papel: req.pessoa.papel });
+  }
+  if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    if (req.pessoa?.papel !== 'dono' && req.pessoa?.papel !== 'equipe') return json(res, 403, { error: 'sem permissão para decidir' });
+    const aprovados = [];
+    // O conjunto seguro é recalculado aqui; o corpo do pedido é ignorado. Cada item é conferido de novo antes de aprovar (sem janela: só entram itens sem needsDialog).
+    for (const { id: pid } of lotesSeguros(pendingNow())) {
+      const item = pendingNow().find((x) => x.id === pid);
+      if (!item?.safe || item.needsDialog || !podeDecidir(req.pessoa, item)) continue;
+      let ok = false;
+      if (item.kind === 'tarefa') ok = (await approve(item.ref)).ok;
+      else if (item.kind === 'chamada' && !callBusy()) { const c = callStore.calls.find((x) => x.id === item.ref); if (c?.state === 'pending') { void runCall(c); ok = true; } }
+      if (!ok) continue;
+      rememberDecision(pid, req.pessoa.nome);
+      auditRecord(config.data, { who: 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/pendencias/aprovar-seguros#${pid}`, status: 200 });
+      aprovados.push(pid);
+    }
+    if (aprovados.length) pollSoon();
+    return json(res, 200, { aprovados });
+  }
   if (p === '/api/ops/tasks' && method === 'POST') { const r = createTask(await readBody(req)); if (!r.ok) return fail(res, r); pollSoon(); return json(res, 201, r.task); }
   if ((m = /^\/api\/ops\/tasks\/([^/]+)\/(approve|reject|retry)$/.exec(p)) && method === 'POST') {
     if (m[2] !== 'retry' && !pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar ou recusar' });
+    const pid = `tarefa:${m[1]}`;
+    if (m[2] !== 'retry' && !gatePending(req, res, pid)) return;
     const body = await readBody(req);
-    if (m[2] === 'approve' && !(await human(res, taskApproveText(listTasks().find((x) => x.id === m[1]))))) return;
+    if (m[2] === 'approve' && !(await human(res, taskApproveText(listTasks().find((x) => x.id === m[1])), pid))) return;
     const r = m[2] === 'approve' ? await approve(m[1]) : m[2] === 'reject' ? reject(m[1], body.feedback) : retryWithTools(m[1], body.allow);
+    if (r.ok && m[2] !== 'retry') rememberDecision(pid, req.pessoa.nome);
     pollSoon();
     return r.ok ? json(res, 200, { ok: true, ...(r.commit !== undefined ? { commit: r.commit } : {}), ...(r.task ? { task: r.task } : {}) }) : fail(res, r);
   }
@@ -826,12 +869,15 @@ ${logs}` : ''}`;
   }
   if ((m = /^\/api\/cli\/requests\/([^/]+)\/(approve|reject)$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    const pid = `terminal:${m[1]}`;
+    if (!gatePending(req, res, pid)) return;
     const item = cliRequests.find((r) => r.id === m[1]);
     if (!item || item.state !== 'pending') return json(res, 404, { error: 'pedido não está esperando aprovação' });
-    if (m[2] === 'reject') { item.state = 'rejected'; saveCli(); return json(res, 200, item); }
-    if (!(await human(res, `Enviar ao terminal "${clip(item.agentName, 40)}" o pedido de ${clip(item.from, 40)}: ${clip(item.text, 500)}`))) return;
+    if (m[2] === 'reject') { item.state = 'rejected'; saveCli(); rememberDecision(pid, req.pessoa.nome); return json(res, 200, item); }
+    if (!(await human(res, `Enviar ao terminal "${clip(item.agentName, 40)}" o pedido de ${clip(item.from, 40)}: ${clip(item.text, 500)}`, pid))) return;
     if (item.state !== 'pending') return json(res, 409, { error: 'o pedido mudou enquanto a confirmação estava aberta' });
     await deliverCli(item);
+    rememberDecision(pid, req.pessoa.nome);
     return json(res, 200, item);
   }
 
@@ -881,6 +927,8 @@ ${logs}` : ''}`;
   }
   if ((m = /^\/api\/agent-proposals\/([^/]+)\/(approve|reject)$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    const pid = `proposta:${m[1]}`;
+    if (!gatePending(req, res, pid)) return;
     const item = agentProposals.find((r) => r.id === m[1]);
     if (!item || item.state !== 'pending') return json(res, 404, { error: 'proposta não está esperando aprovação' });
     if (m[2] === 'approve' && !(await human(res, item.delete ? `EXCLUIR o agente ${clip(item.name, 40)} (permanente)?` : `Criar o agente ${clip(item.agent?.name, 40)} (${clip(item.agent?.role, 80)}) com as ferramentas: ${clip((item.agent?.tools || []).join(', ') || 'nenhuma', 120)}?`))) return;
@@ -889,6 +937,7 @@ ${logs}` : ''}`;
     else if (item.delete) { const r = deleteAgent(item.delete); item.state = r.ok ? 'deleted' : 'failed'; if (!r.ok) item.error = r.errors.join('; '); else pollSoon(); }
     else { const r = createAgent(item.agent); item.state = r.ok ? 'created' : 'failed'; if (!r.ok) item.error = r.errors.join('; '); else pollSoon(); }
     saveProps();
+    rememberDecision(pid, req.pessoa.nome);
     return json(res, 200, item);
   }
 
@@ -913,15 +962,18 @@ ${logs}` : ''}`;
   }
   if ((m = /^\/api\/agent-calls\/([^/]+)\/(approve|reject)$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    const pid = `chamada:${m[1]}`;
+    if (!gatePending(req, res, pid)) return;
     const c = callStore.calls.find((x) => x.id === m[1]);
     if (!c || c.state !== 'pending') return json(res, 404, { error: 'chamada não está esperando aprovação' });
-    if (m[2] === 'reject') { c.state = 'rejected'; saveCalls(); return json(res, 200, c); }
+    if (m[2] === 'reject') { c.state = 'rejected'; saveCalls(); rememberDecision(pid, req.pessoa.nome); return json(res, 200, c); }
     if (callBusy()) return json(res, 429, { error: 'já há uma chamada em andamento' });
     const { always } = await readBody(req);
-    if (!(await human(res, `Deixar ${clip(c.fromName, 40)} chamar ${clip(c.toName, 40)}${always === true ? ' PARA SEMPRE' : ''}: ${clip(c.text, 400)}`))) return;
+    if (!(await human(res, `Deixar ${clip(c.fromName, 40)} chamar ${clip(c.toName, 40)}${always === true ? ' PARA SEMPRE' : ''}: ${clip(c.text, 400)}`, always === true ? undefined : pid))) return; // "para sempre" é um poder maior que a chamada: sempre pede o "sim"
     if (c.state !== 'pending' || callBusy()) return json(res, 409, { error: 'a chamada mudou enquanto a confirmação estava aberta' });
     if (always === true && !granted(c.from, c.to)) callStore.grants.push({ from: c.from, to: c.to });
     void runCall(c);
+    rememberDecision(pid, req.pessoa.nome);
     return json(res, 200, c);
   }
 

@@ -66,7 +66,7 @@ export const phoneCookieName = (port) => `v2_cel_${port}`;
 export const newPhoneToken = () => crypto.randomBytes(24).toString('hex');
 
 /** Única escrita que o celular faz: aprovar ou recusar (tarefas, pedidos de terminal, propostas e chamadas de agentes, permissões). */
-export const PHONE_WRITES = /^\/api\/(?:ops\/tasks|cli\/requests|agent-proposals|agent-calls)\/[^/]+\/(?:approve|reject)$|^\/api\/permissions\/[^/]+\/decision$/;
+export const PHONE_WRITES = /^\/api\/(?:ops\/tasks|cli\/requests|agent-proposals|agent-calls)\/[^/]+\/(?:approve|reject)$|^\/api\/permissions\/[^/]+\/decision$|^\/api\/pendencias\/aprovar-seguros$/;
 
 const CELULAR = { nome: 'celular', papel: 'dono' };
 

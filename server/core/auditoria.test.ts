@@ -16,8 +16,9 @@ describe('quais rotas são auditadas', () => {
   it.each([
     ['DELETE', '/api/agents/marina'], ['PUT', '/api/company'], ['DELETE', '/api/conversation/x'], ['PUT', '/api/offices/a'],
     ['POST', '/api/backups/2026-10-19/restore'], ['POST', '/api/agent-proposals/p1/approve'], ['POST', '/api/ops/tasks/t1/approve'], ['POST', '/api/rooms/rename'], ['POST', '/api/deliveries/upload/a/b.png'],
+    ['POST', '/api/cli/requests/r1/approve'], ['POST', '/api/agent-calls/c1/approve'], ['POST', '/api/pendencias/aprovar-seguros'],
   ])('audita %s %s', (m, p) => expect(shouldAudit(m, p)).toBe(true));
-  it.each([['GET', '/api/agents/marina'], ['POST', '/api/messages'], ['POST', '/api/build/rooms'], ['POST', '/api/ops/tasks/t1/reject'], ['POST', '/api/agent-proposals/p1/reject']])('não audita %s %s', (m, p) => expect(shouldAudit(m, p)).toBe(false));
+  it.each([['GET', '/api/agents/marina'], ['POST', '/api/messages'], ['POST', '/api/build/rooms'], ['POST', '/api/ops/tasks/t1/reject'], ['POST', '/api/agent-proposals/p1/reject'], ['POST', '/api/cli/requests/r1/reject'], ['POST', '/api/agent-calls/c1/reject'], ['GET', '/api/holding']])('não audita %s %s', (m, p) => expect(shouldAudit(m, p)).toBe(false));
 });
 
 describe('gravação', () => {
