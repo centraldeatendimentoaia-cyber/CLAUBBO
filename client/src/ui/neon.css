@@ -108,3 +108,24 @@
   .hold-todos { margin-left: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .hold-btn:active:not(:disabled) { transform: none; } }
+
+/* Menu de interação do boneco (tecla E): dica perto do alvo e menu numerado. Tokens néon: borda branca de 3px, sombra em degrau, sem blur. */
+.int-dica { position: fixed; z-index: 60; transform: translate(-50%, -100%); padding: 4px 10px; background: var(--neon-roxo); color: var(--neon-branco); border: var(--neon-borda); border-radius: 8px; box-shadow: var(--neon-degrau); font: 800 13px var(--neon-fonte-corpo); white-space: nowrap; pointer-events: none; }
+.int { position: fixed; z-index: 70; width: 290px; max-width: calc(100vw - 16px); padding: 8px; background: var(--neon-roxo); color: var(--neon-branco); border: var(--neon-borda); border-radius: 10px; box-shadow: var(--neon-degrau); font-family: var(--neon-fonte-corpo); box-sizing: border-box; }
+.int *, .int *::before, .int *::after { box-sizing: border-box; }
+.int-titulo { margin: 0 0 6px; padding: 2px 8px; font: 700 15px var(--neon-fonte-titulo); color: var(--neon-amarelo); overflow-wrap: anywhere; }
+.int-texto, .int-resp { margin: 4px 8px 8px; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
+.int-item { display: block; width: 100%; padding: 6px 30px 6px 8px; position: relative; text-align: left; font: 14px var(--neon-fonte-corpo); color: var(--neon-branco); background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.int-item kbd { position: absolute; right: 8px; top: 8px; font: 800 11px var(--neon-fonte-corpo); opacity: 0.8; }
+.int-item.is-on, .int-item:hover:not(.is-apagado) { background: var(--neon-amarelo); color: var(--neon-profundo); font-weight: 700; }
+/* Apagado mas legível: o motivo aparece em texto e o contraste continua acima de 4,5:1 sobre o roxo. */
+.int-item.is-apagado { color: var(--neon-lilas); cursor: not-allowed; }
+.int-item.is-apagado.is-on { background: transparent; outline: 2px dashed var(--neon-amarelo); outline-offset: -2px; color: var(--neon-branco); }
+.int-motivo { font-size: 12px; font-style: italic; }
+.int-campo { display: block; width: calc(100% - 16px); margin: 0 8px; padding: 6px 8px; font: 14px var(--neon-fonte-corpo); color: var(--neon-branco); background: var(--neon-noite); border: var(--neon-borda); border-radius: 6px; resize: vertical; }
+.int-acoes { display: flex; gap: 8px; margin: 8px 8px 2px; }
+.int-btn { flex: 1; min-height: 34px; padding: 6px 12px; font: 800 13px var(--neon-fonte-corpo); color: var(--neon-branco); background: var(--neon-noite); border: var(--neon-borda); border-radius: 8px; box-shadow: var(--neon-degrau); cursor: pointer; }
+.int-btn--ok { background: var(--neon-lima); color: var(--neon-noite); }
+.int-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--neon-profundo); }
+.int button:focus-visible, .int textarea:focus-visible { outline: 3px solid var(--neon-amarelo); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .int-btn:active { transform: none; } }

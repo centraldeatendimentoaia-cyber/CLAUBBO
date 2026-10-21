@@ -521,7 +521,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const playerKeys = new Set<string>();
   let playerShift = false;
   const pushPlayerIntent = () => {
-    playerIntent = playerMe && !playback && !suspended ? intentFrom(playerKeys, playerShift) : { ...NO_INTENT };
+    // Só anda com o andar do boneco na tela (o seletor de andar da UI pode mostrar outro: o boneco invisível não se move).
+    playerIntent = playerMe && !playback && !suspended && playerFloor === activeFloor ? intentFrom(playerKeys, playerShift) : { ...NO_INTENT };
     const s = playerSim();
     if (s) s.visitorIntent = { ...playerIntent };
   };

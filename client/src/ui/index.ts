@@ -5,6 +5,7 @@
 import { access, onAccessChange } from '../net/access';
 import { CliRequests } from './cli-requests';
 import { setFloor } from '../floor';
+import { criarInteracao } from './interacao';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/500.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -47,7 +48,7 @@ import { WorldDialog } from './world/world-dialog';
 import { WorldSocialNotifier } from './world/away-summary';
 import { worldGate } from './world/settings-world';
 import { worldSectionMode } from './world/world-model';
-import { SceneSwitch, type CitySceneHost } from './world/scene-switch';
+import { SceneSwitch, citySceneAvailable, type CitySceneHost } from './world/scene-switch';
 import { worldSource } from '../net/world';
 import { FreeArea } from './viewport';
 import { tr } from '../../../shared/i18n';
@@ -316,6 +317,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   if (scene) components.push(scene);
   root.append(worldSocial.el);
   components.push(worldSocial);
+  // O boneco do jogador e o menu da tecla E (só quando o mundo tem boneco; a cena Visita não tem).
+  criarInteracao(ctx, inCity, () => citySceneAvailable(hw, worldGate(ctx, hw)));
 
   // ---------------------------------------------------------------- renderização agrupada por quadro
   let rafId = 0;
