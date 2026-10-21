@@ -64,10 +64,14 @@ export const isLoopback = (addr) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].inc
 export const phoneCookieName = (port) => `v2_cel_${port}`;
 export const newPhoneToken = () => crypto.randomBytes(24).toString('hex');
 
+/** Única escrita que o celular faz: aprovar ou recusar (tarefas, pedidos de terminal, propostas e chamadas de agentes, permissões). */
+export const PHONE_WRITES = /^\/api\/(?:ops\/tasks|cli\/requests|agent-proposals|agent-calls)\/[^/]+\/(?:approve|reject)$|^\/api\/permissions\/[^/]+\/decision$/;
+
 /** Decide uma requisição que veio da rede: 'deny' (com motivo), 'redirect' (primeira visita, grava o cookie e tira o token da URL) ou 'allow'. */
 export function phoneGate(req, url, token, port) {
-  if (req.method !== 'GET' && req.method !== 'HEAD') return { action: 'deny', status: 403, error: 'celular: somente leitura' };
-  const given = url.searchParams.get('t');
+  const read = req.method === 'GET' || req.method === 'HEAD';
+  if (!read && !(req.method === 'POST' && PHONE_WRITES.test(url.pathname))) return { action: 'deny', status: 403, error: 'celular: só aprovar e recusar; o resto é somente leitura' };
+  const given = read ? url.searchParams.get('t') : null; // escrita só vale com o cookie, nunca com o token na URL
   if (given && token && same(given, token)) {
     url.searchParams.delete('t');
     const clean = url.pathname + (url.search || '');

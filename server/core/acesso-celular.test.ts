@@ -50,10 +50,27 @@ describe('modo celular', () => {
     expect(phoneGate(req('GET', 'v2_cel_4530=outro'), url('/api/snapshot'), TOKEN, 4530).action).toBe('deny');
   });
 
-  it('nunca deixa escrever, nem com token e cookie válidos', () => {
+  it('não deixa escrever fora de aprovar e recusar, nem com token e cookie válidos', () => {
     for (const m of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       expect(phoneGate(req(m, `v2_cel_4530=${TOKEN}`), url(`/api/chat?t=${TOKEN}`), TOKEN, 4530)).toMatchObject({ action: 'deny', status: 403 });
     }
+    for (const m of ['PUT', 'PATCH', 'DELETE']) {
+      expect(phoneGate(req(m, `v2_cel_4530=${TOKEN}`), url('/api/ops/tasks/abc/approve'), TOKEN, 4530).action).toBe('deny');
+    }
+    for (const p of ['/api/ops/tasks/abc/retry', '/api/ops/tasks/abc/approve/x', '/api/company', '/api/backup/restore']) {
+      expect(phoneGate(req('POST', `v2_cel_4530=${TOKEN}`), url(p), TOKEN, 4530).action).toBe('deny');
+    }
+  });
+
+  it('com o cookie deixa aprovar e recusar', () => {
+    for (const p of ['/api/ops/tasks/abc/approve', '/api/ops/tasks/abc/reject', '/api/cli/requests/1/approve', '/api/agent-proposals/1/reject', '/api/agent-calls/1/approve', '/api/permissions/9/decision']) {
+      expect(phoneGate(req('POST', `v2_cel_4530=${TOKEN}`), url(p), TOKEN, 4530).action).toBe('allow');
+    }
+  });
+
+  it('aprovar sem cookie é negado, e o token na URL não vale para escrita', () => {
+    expect(phoneGate(req('POST'), url('/api/ops/tasks/abc/approve'), TOKEN, 4530).action).toBe('deny');
+    expect(phoneGate(req('POST'), url(`/api/ops/tasks/abc/approve?t=${TOKEN}`), TOKEN, 4530).action).toBe('deny');
   });
 
   it('sem token configurado nada passa', () => {

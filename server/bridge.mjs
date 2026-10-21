@@ -353,14 +353,16 @@ const habOutbox = new Set(); // mensagens entregues pelo Claubbo original (andar
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readBody = async (req, max) => parseBody(await readBodyText(req, max));
 /** Escrita só da página desta própria porta (ou de processos locais sem Origin, como o servidor MCP dos agentes). */
-const sameOrigin = (req) => { const o = req.headers.origin; return !o || o === `http://127.0.0.1:${PORT}` || o === `http://localhost:${PORT}`; };
+const ORIGINS = [`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`, ...(LAN_HOST ? [`http://${LAN_HOST}:${PORT}`] : [])]; // o do celular só no modo celular
+const sameOrigin = (req) => { const o = req.headers.origin; return !o || ORIGINS.includes(o); };
 /** Aprovar exige a página: o Origin precisa estar presente e ser o desta porta. */
-const pageOrigin = (req) => [`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`].includes(req.headers.origin);
+const pageOrigin = (req) => ORIGINS.includes(req.headers.origin);
 let access = null; // tokens da instalação (data/acesso.json), lidos na subida
 /** Quem usa o token `agentes` (servidor MCP cli-agents) só cria coisas que esperam o OK do João. */
 const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-calls)$/;
 /** Pede o "sim" de uma pessoa diante do computador (janela do Windows). Recusado: já responde o erro e devolve false. */
-const human = async (res, what) => { const r = await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
+/** Vindo do celular (já passou pelo token do QR code e só chega aqui em aprovar/recusar), quem aprova é a pessoa no celular: não abre a janela. */
+const human = async (res, what) => { const r = fromNetwork(res.req) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
 /** Cadastro/troca do sistema de um agente: valida e mostra ao João o comando JÁ normalizado e a pasta. false = já respondeu. */
 const gateSystem = async (res, body, who) => {
   if (body.system === undefined) return true;
@@ -479,7 +481,7 @@ async function route(req, res, url) {
   if (p === '/api/access') return json(res, 200, { remote: false, local: true, permissions: true, messages: true, terminal: true, spawn: false });
   if (method !== 'GET') { // toda escrita: origem da própria porta E token da instalação (cookie da página ou cabeçalho)
     if (!sameOrigin(req)) return json(res, 403, { error: 'origem não permitida' });
-    const role = roleOf(req, access, PORT);
+    const role = fromNetwork(req) ? 'celular' : roleOf(req, access, PORT); // rede: o phoneGate já exigiu o cookie do QR code e só deixa aprovar/recusar
     if (!role) return json(res, 403, { error: 'token de acesso ausente ou inválido: recarregue a página do Escritório' });
     if (role === 'agentes' && !(method === 'POST' && AGENT_ROUTES.test(p))) return json(res, 403, { error: 'o token dos agentes só vale para criar pedidos e propostas' });
     if (shouldAudit(method, p)) res.on('finish', () => auditRecord(config.data, { who: role, method, path: p, status: res.statusCode }));
@@ -1037,7 +1039,7 @@ export function start() {
 `, { mode: 0o600 });
     process.on('exit', () => { try { fs.unlinkSync(file); } catch { /* já sumiu */ } });
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
-    console.log(`Celular liberado (somente leitura): o endereço com o token está em ${file}`);
+    console.log(`Celular liberado (ver, aprovar e recusar): o endereço com o token está em ${file}`);
   });
   return server;
 }
