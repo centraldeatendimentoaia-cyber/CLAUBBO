@@ -15,7 +15,8 @@ const RISCO = {
 const DESCONHECIDO = { ...BASE, reversible: false, ownerOnly: true, needsDialog: true };
 
 export function classify(kind, stage) {
-  const r = (kind === 'tarefa' ? RISCO[`tarefa:${stage}`] : RISCO[kind]) ?? DESCONHECIDO;
+  const key = kind === 'tarefa' ? `tarefa:${stage}` : kind;
+  const r = Object.hasOwn(RISCO, key) ? RISCO[key] : DESCONHECIDO;
   const safe = !r.cost && r.reversible && !r.sendsMessage && !r.ownerOnly && !r.needsDialog;
   return { ...r, safe };
 }

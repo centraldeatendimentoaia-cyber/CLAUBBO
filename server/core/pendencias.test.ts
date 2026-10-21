@@ -67,3 +67,12 @@ describe('decisões lembradas', () => {
     expect(decisionOf('x:199')?.nome).toBe('B');
   });
 });
+
+describe('classify: chaves herdadas', () => {
+  it('trata nome de propriedade de Object como desconhecido, nunca seguro', () => {
+    const c = classify('constructor');
+    expect(c.safe).toBe(false);
+    expect(c.needsDialog).toBe(true);
+    expect(c.ownerOnly).toBe(true);
+  });
+});
