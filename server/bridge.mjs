@@ -47,7 +47,7 @@ import { events } from './core/events.mjs';
 import { MAX_FILE, openById, saveFile } from './core/entregas.mjs';
 import { inService } from './core/hours.mjs';
 import { cleanFolder, cleanSystem, stripSystem } from './core/system-config.mjs';
-import { IPV4, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
+import { IPV4, PHONE_WRITES, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
@@ -361,8 +361,8 @@ let access = null; // tokens da instalação (data/acesso.json), lidos na subida
 /** Quem usa o token `agentes` (servidor MCP cli-agents) só cria coisas que esperam o OK do João. */
 const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-calls)$/;
 /** Pede o "sim" de uma pessoa diante do computador (janela do Windows). Recusado: já responde o erro e devolve false. */
-/** Vindo do celular (já passou pelo token do QR code e só chega aqui em aprovar/recusar), quem aprova é a pessoa no celular: não abre a janela. */
-const human = async (res, what) => { const r = fromNetwork(res.req) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
+/** Vindo do celular (já passou pelo token do QR code) numa rota de aprovar/recusar, quem decide é a pessoa no celular: não abre a janela. Qualquer outra escrita do celular ainda pede o "sim" no computador. */
+const human = async (res, what) => { const r = fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
 /** Cadastro/troca do sistema de um agente: valida e mostra ao João o comando JÁ normalizado e a pasta. false = já respondeu. */
 const gateSystem = async (res, body, who) => {
   if (body.system === undefined) return true;
