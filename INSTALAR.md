@@ -22,9 +22,10 @@ Regras:
 
 0. Descubra o sistema e os pré-requisitos
 - Detecte o sistema operacional e a arquitetura (`uname -sm`; no Windows, `$env:OS` e `[Environment]::OSVersion`) e adapte os comandos (PowerShell no Windows, shell no Mac e no Linux).
-- Confira: Node.js 22.12 ou mais novo (`node -v`), npm, git e o Claude Code (`claude --version`). O Docker (`docker info`) é opcional: só serve para o andar 2.
+- Confira: Node.js 22.12 ou mais novo (`node -v`), npm, git e o Claude Code (`claude --version`). O Docker (`docker info`) também é necessário: é ele que liga o andar 2, onde aparecem as sessões do Claude Code abertas em terminais.
 - Se faltar Node ou git, instale pelo gerenciador de pacotes do sistema (winget no Windows, brew no Mac, apt/dnf no Linux) pedindo a minha aprovação. Se faltar o Claude Code, instale com `npm i -g @anthropic-ai/claude-code`. Depois recarregue o PATH.
-- Se o Docker faltar, avise que o andar 2 (terminais do Claude Code) ficará vazio, sugira instalar o Docker Desktop e continue sem ele, a menos que eu peça para instalar.
+- Se o Docker faltar, instale-o você mesmo, pedindo a minha aprovação: Windows, `winget install -e --id Docker.DockerDesktop`; Mac, `brew install --cask docker`; Linux, o Docker Engine pelo gerenciador de pacotes da distribuição (e `sudo systemctl enable --now docker`). No Windows, o Docker Desktop precisa do WSL2: se pedir para reiniciar o computador, pare, me explique que só preciso reiniciar e colar este mesmo prompt de novo.
+- Depois de instalar, abra o Docker Desktop (Windows: `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`; Mac: `open -a Docker`), aceite os termos se ele pedir e espere o engine subir: repita `docker info` a cada 5 segundos, por até 3 minutos, até responder sem erro. Se ele pedir login, diga que dá para pular ("Skip") e que o login não é necessário.
 
 1. Baixe o projeto
 - Clone o repositório em uma pasta nova `Claubbo` dentro da minha pasta de usuário (`git clone https://github.com/centraldeatendimentoaia-cyber/CLAUBBO.git`). Se o clone pedir login, rode `gh auth login` (ou me peça para entrar no GitHub). Entre na pasta e use o caminho absoluto dela nos passos seguintes.
@@ -32,9 +33,9 @@ Regras:
 2. Instale e compile o escritório
 - Na raiz: `npm ci` e depois `npm run build`. Se o `npm ci` falhar em pacotes opcionais (`node-pty`, `@xterm/*`), siga em frente: eles são opcionais.
 
-3. Suba o Habblaud no Docker (só se o Docker estiver instalado e rodando)
+3. Suba o Habblaud no Docker (é o que mostra o andar 2; não pule este passo)
 - `cd habblaud`, `npm ci` e `npm run docker:up`. Espere o `/api/health` responder em http://127.0.0.1:4747.
-- Confira com `docker ps` que o contêiner `habblaud` está de pé.
+- Confira com `docker ps` que o contêiner `habblaud` está de pé. Se o `docker:up` falhar, leia o erro, corrija (Docker parado, porta 4747 ocupada, falta de `npm ci` em `habblaud`) e rode de novo, até o `/api/health` responder.
 
 4. Instale os plugins do Habblaud no Claude Code (precisa do Claude Code 2.1.287 ou mais novo)
 - Em `habblaud`: `npm run mod:install` e depois `npm run mod:status`. Instale sempre a versão completa, sem `--sem-permissoes` nem `--sem-mensagens`.
@@ -48,7 +49,7 @@ Regras:
 - No Windows, o `abrir-escritorio.cmd` da pasta instalada sobe o servidor e abre a página. Se eu quiser um atalho na área de trabalho, crie um que aponte para ele.
 
 7. Verifique e me entregue
-- Abra http://127.0.0.1:4530 no navegador. Confira que as salas aparecem e que, se o Docker estiver no ar, o andar 2 lista as sessões do Claude Code.
+- Abra http://127.0.0.1:4530 no navegador. Confira que as salas aparecem e que o andar 2 lista as sessões do Claude Code (abra o `claude` em qualquer pasta e veja o personagem chegar; se a lista ficar vazia, revise os passos 3 e 4).
 - Me diga, em poucas linhas: o que foi instalado, o que ficou de fora e por quê, a URL do escritório e o comando para iniciar de novo.
 - Me lembre do último passo, que é meu: em *Operações > Contas*, conectar a conta Claude (e a do Codex, se eu usar). O login é feito por mim, nunca por você.
 ````
