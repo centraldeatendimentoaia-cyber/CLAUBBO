@@ -15,6 +15,7 @@ import type { RoomState } from '../sim/room-state';
 import { cobwebScale, hourglassIcon, HOURGLASS_FLIP_MS, STORM_LIFT } from '../sim/shell';
 import type { Sim } from '../sim/sim';
 import { buildAnim, furnitureScale, NO_ANIM, sweepDelay, type BuildAnim } from './anim';
+import { auraDe, desenharAura, tremorDe } from './aura';
 import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
@@ -65,6 +66,8 @@ export interface HeadInfo {
   depth: number;
 }
 
+/** px de mundo por unidade da referência da aura (a chama suprema fica com ~48 px de altura). */
+const AURA_ESCALA = 0.17;
 const TV_MODES: ScreenMode[] = ['browser', 'idle', 'chat', 'code'];
 /**
  * Boca do balde de pipoca (px relativos aos pés) na pose 'wait' sentada, por direção — segue o rig
@@ -119,6 +122,7 @@ export class Renderer {
   private clearColor = '#7fae62';
   private grass: CanvasPattern | null = null;
   private theme: SeasonalTheme = 'none';
+  private reduzirMovimento = false;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -129,6 +133,12 @@ export class Renderer {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.exterior = layoutExterior(sim.building.cols);
     this.lighting = new Lighting(art, sim);
+    // movimento reduzido: lido uma vez e atualizado quando a preferência muda
+    if (typeof matchMedia === 'function') {
+      const mq = matchMedia('(prefers-reduced-motion: reduce)');
+      this.reduzirMovimento = mq.matches;
+      mq.addEventListener?.('change', (ev) => (this.reduzirMovimento = ev.matches));
+    }
   }
 
   setAssets(a: WorldAssets | null): void {
@@ -871,6 +881,16 @@ export class Renderer {
       const sh = shadowSprite();
       ctx.drawImage(sh.canvas, x - sh.ax, y - sh.ay);
     }
+    // aura do modelo: só agentes, nunca o visitante nem quem veste o traje JMAL (visual exclusivo do dono)
+    const aura = ch === this.sim.visitor || ch.info.costume === 'jmal' ? null : auraDe(ch.info.model, ch.info.provider);
+    let tx = 0;
+    let ty = 0;
+    if (aura) {
+      desenharAura(ctx, aura, x, y, now, { reduzirMovimento: this.reduzirMovimento, escala: AURA_ESCALA, semente: ch.info.seed });
+      const t = tremorDe(aura, now, ch.info.seed, this.reduzirMovimento);
+      tx = t.dx;
+      ty = t.dy;
+    }
     let sprite: Sprite | null = null;
     const req: CharacterFrameRequest = this.req;
     req.appearance = ch.appearance;
@@ -897,7 +917,7 @@ export class Renderer {
     if (sprite) {
       const sx = x - sprite.ax;
       const sy = y - sprite.ay;
-      ctx.drawImage(sprite.canvas, sx, sy);
+      ctx.drawImage(sprite.canvas, sx + tx, sy + ty);
       const b = opaqueBounds(sprite.canvas);
       head.bx = sx + b.x;
       head.by = sy + b.y;
