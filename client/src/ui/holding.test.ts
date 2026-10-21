@@ -96,3 +96,22 @@ describe('painel da holding (renderer)', () => {
     expect(el.textContent).toContain('Nenhuma rotina');
   });
 });
+
+describe('painel da holding (foco e lote)', () => {
+  it('o título "Esperando você" aceita foco programático (destino quando não sobra cartão)', async () => {
+    const { el } = await render(view({ pendencias: [] }));
+    const titulo = el.all().find((e) => e.attrs['data-k'] === 'titulo')!;
+    expect(titulo.tag).toBe('h2');
+    expect(titulo.tabIndex).toBe(-1);
+  });
+
+  it('lote em andamento mostra o botão desligado com "Enviando…"', async () => {
+    const { renderHolding, base } = await opts();
+    const el = renderHolding(view(), { ...base, ocupados: new Set(['lote']) }) as unknown as FakeEl;
+    const lote = el.all().find((e) => e.attrs['data-k'] === 'lote')!;
+    expect('disabled' in lote.attrs).toBe(true);
+    expect(lote.textContent).toContain('Enviando…');
+    const normal = renderHolding(view(), base) as unknown as FakeEl;
+    expect('disabled' in normal.all().find((e) => e.attrs['data-k'] === 'lote')!.attrs).toBe(false);
+  });
+});

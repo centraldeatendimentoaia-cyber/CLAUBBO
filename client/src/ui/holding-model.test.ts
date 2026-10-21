@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HoldingView, PendingItem } from '../../../shared/types';
-import { actionsOf, ageLabel, agentMarker, applyDecision, batchState, canDecide, decisionOutcome, decisionUrl, emptyKind, keyAction, rotinaMarker, shortcutFor, sortPending, tagsOf } from './holding-model';
+import { actionsOf, ageLabel, agentMarker, applyDecision, batchState, canDecide, decisionOutcome, decisionUrl, emptyKind, focusAfterRemoval, keyAction, rotinaMarker, tabWrap, shortcutFor, sortPending, tagsOf } from './holding-model';
 
 const item = (o: Partial<PendingItem> = {}): PendingItem => ({
   id: 'tarefa:t1', kind: 'tarefa', ref: 't1', stage: 'plan', agent: 'ana', title: 'Plano', text: '', since: 0, urgent: false,
@@ -137,5 +137,25 @@ describe('rotinaMarker e decisionUrl', () => {
     expect(decisionUrl(item({ kind: 'terminal', ref: 'r1' }), 'recusar')).toBe('/api/cli/requests/r1/reject');
     expect(decisionUrl(item({ kind: 'proposta', ref: 'p1' }), 'aprovar')).toBe('/api/agent-proposals/p1/approve');
     expect(decisionUrl(item({ kind: 'chamada', ref: 'c1' }), 'recusar')).toBe('/api/agent-calls/c1/reject');
+  });
+});
+
+describe('foco depois de decidir e Tab preso', () => {
+  const a = item({ id: 'tarefa:a', since: 1 }), b = item({ id: 'tarefa:b', since: 2 }), c = item({ id: 'tarefa:c', since: 3 });
+  it('foco vai para o cartão da mesma posição, o anterior se era o último, ou para o título', () => {
+    expect(focusAfterRemoval([a, b, c], 'tarefa:a')).toBe('tarefa:b');
+    expect(focusAfterRemoval([a, b, c], 'tarefa:b')).toBe('tarefa:c');
+    expect(focusAfterRemoval([a, b, c], 'tarefa:c')).toBe('tarefa:b');
+    expect(focusAfterRemoval([a], 'tarefa:a')).toBeNull();
+    expect(focusAfterRemoval([a], 'tarefa:zz')).toBeNull();
+  });
+  it('Tab dá a volta entre o primeiro e o último focável', () => {
+    expect(tabWrap(2, 3, false)).toBe(0);
+    expect(tabWrap(0, 3, true)).toBe(2);
+    expect(tabWrap(1, 3, false)).toBeNull();
+    expect(tabWrap(1, 3, true)).toBeNull();
+    expect(tabWrap(-1, 3, false)).toBe(0);
+    expect(tabWrap(-1, 3, true)).toBe(2);
+    expect(tabWrap(0, 0, false)).toBeNull();
   });
 });

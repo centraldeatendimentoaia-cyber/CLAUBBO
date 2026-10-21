@@ -119,3 +119,20 @@ const DECISION_BASE: Record<PendingItem['kind'], string> = {
 /** Rota existente que decide o pedido (as mesmas que os outros painéis usam). */
 export const decisionUrl = (p: Pick<PendingItem, 'kind' | 'ref'>, acao: 'aprovar' | 'recusar'): string =>
   `${DECISION_BASE[p.kind]}/${encodeURIComponent(p.ref)}/${acao === 'aprovar' ? 'approve' : 'reject'}`;
+
+/** Para onde vai o foco quando o cartão `removedId` sai da tela: o cartão que ocupa a mesma posição, o anterior se era o último, ou o título. */
+export function focusAfterRemoval(pendencias: PendingItem[], removedId: string): string | null {
+  const fila = sortPending(pendencias);
+  const i = fila.findIndex((p) => p.id === removedId);
+  if (i < 0) return null;
+  return (fila[i + 1] ?? fila[i - 1])?.id ?? null;
+}
+
+/** Tab preso na janela: quando o foco sai de uma ponta, devolve o índice da outra; senão null (o navegador segue sozinho). `index` -1 = foco fora dos focáveis. */
+export function tabWrap(index: number, count: number, shift: boolean): number | null {
+  if (count === 0) return null;
+  if (index < 0) return shift ? count - 1 : 0;
+  if (shift && index === 0) return count - 1;
+  if (!shift && index === count - 1) return 0;
+  return null;
+}

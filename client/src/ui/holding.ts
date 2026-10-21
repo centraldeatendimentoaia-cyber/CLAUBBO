@@ -6,7 +6,7 @@ import { Wallets } from '../world/social/wallet';
 import type { UiComponent, UiContext } from './context';
 import { h } from './dom';
 import {
-  actionsOf, ageLabel, applyDecision, batchState, decisionOutcome, decisionUrl, keyAction, rotinaMarker, shortcutFor, sortPending, tagsOf,
+  actionsOf, ageLabel, applyDecision, batchState, decisionOutcome, decisionUrl, focusAfterRemoval, keyAction, rotinaMarker, shortcutFor, sortPending, tabWrap, tagsOf,
   type Marcador, type Outcome,
 } from './holding-model';
 import { safeLocalStorage } from './prefs';
@@ -93,10 +93,10 @@ export function renderHolding(v: HoldingView, o: RenderOpts): HTMLElement {
     h(
       'div',
       { class: 'hold-hh' },
-      h('h2', { class: 'hold-h2', text: 'Esperando você' }),
+      h('h2', { class: 'hold-h2', text: 'Esperando você', tabIndex: -1, attrs: { 'data-k': 'titulo' } }),
       h('small', { text: fila.length ? `${fila.length} ${tipo(fila.length, 'pedido', 'pedidos')}${urgentes ? ` · ${urgentes} com espera longa` : ''}` : '' }),
       lote.enabled
-        ? h('button', { class: 'hold-btn hold-btn--lima hold-todos', type: 'button', attrs: { 'aria-label': `Aprovar os seguros (${lote.count}), atalho A` }, on: { click: () => o.on.lote() } }, `Aprovar os seguros (${lote.count})`, h('kbd', { text: 'A', attrs: { 'aria-hidden': 'true' } }))
+        ? h('button', { class: 'hold-btn hold-btn--lima hold-todos', type: 'button', attrs: { 'data-k': 'lote', 'aria-label': `Aprovar os seguros (${lote.count}), atalho A`, disabled: o.ocupados.has('lote') }, on: { click: () => o.on.lote() } }, o.ocupados.has('lote') ? 'Enviando…' : `Aprovar os seguros (${lote.count})`, h('kbd', { text: 'A', attrs: { 'aria-hidden': 'true' } }))
         : null,
     ),
     ...o.avisos.map((a) => h('p', { class: 'hold-nota hold-nota--geral', text: a })),
@@ -195,6 +195,7 @@ export class HoldingPanel implements UiComponent {
   private apertando = false;
   private sujo = false;
   private contagem = -1;
+  private coins: number | null = null;
 
   constructor(private readonly ctx?: UiContext) {}
 
@@ -207,12 +208,13 @@ export class HoldingPanel implements UiComponent {
 
   open(opener?: HTMLElement | null): void {
     if (this.root) return;
-    this.opener = opener ?? null;
+    // Quem abriu recebe o foco de volta ao fechar (o botão da barra ou, na falta dele, o que tinha o foco).
+    this.opener = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const fechar = h('button', { class: 'hold-btn hold-btn--roxo', type: 'button', text: 'Fechar (Esc)', on: { click: () => this.close() } });
     this.content = h('div', { class: 'hold-content' }, h('p', { class: 'hold-vazio', text: 'Carregando…' }));
     // Região viva fixa (fora do que é redesenhado): é ela que o leitor de tela anuncia.
     this.live = h('div', { class: 'hold-sr', role: 'status', attrs: { 'aria-live': 'polite' } });
-    this.root = h('div', { class: 'hold', role: 'dialog', attrs: { 'aria-label': 'Painel da holding' } }, h('div', { class: 'hold-head' }, h('h1', { class: 'hold-h1', text: 'Holding' }), fechar), this.live, this.content);
+    this.root = h('div', { class: 'hold', role: 'dialog', attrs: { 'aria-label': 'Painel da holding', 'aria-modal': 'true' } }, h('div', { class: 'hold-head' }, h('h1', { class: 'hold-h1', text: 'Holding' }), fechar), this.live, this.content);
     this.root.addEventListener('pointerdown', () => { this.apertando = true; });
     (document.querySelector('.ui-root') ?? document.body).append(this.root);
     window.addEventListener('keydown', this.onKey, true);
@@ -237,7 +239,16 @@ export class HoldingPanel implements UiComponent {
     this.minuto = -1;
     this.contagem = -1;
     this.apertando = false;
-    this.opener?.focus?.();
+    this.sujo = false;
+    this.semRede = false;
+    this.view = null;
+    this.notes.clear();
+    this.avisos = [];
+    this.abertos.clear();
+    this.ocupados.clear();
+    this.focoDepois = null;
+    if (this.opener?.isConnected) this.opener.focus();
+    this.opener = null;
   }
 
   /** Quando o resto da interface muda (UiComponent): só redesenha se a janela estiver aberta. */
@@ -266,6 +277,9 @@ export class HoldingPanel implements UiComponent {
       this.close();
       return;
     }
+    if (e.key === 'Tab') return this.prenderTab(e);
+    // O escritório (e a cidade) não andam por teclas atrás da janela.
+    if (/^(w|a|s|d|Arrow.*)$/i.test(e.key) && !digitando(e.target)) e.stopPropagation();
     if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.repeat || digitando(e.target) || !this.view) return;
     const a = keyAction(this.view, e.key);
     if (!a) return;
@@ -278,6 +292,28 @@ export class HoldingPanel implements UiComponent {
     else this.abrir(p);
   };
 
+  /** Tab fica dentro da janela: do último focável volta ao primeiro e vice-versa. */
+  private prenderTab(e: KeyboardEvent): void {
+    if (!this.root) return;
+    const lista = [...this.root.querySelectorAll<HTMLElement>('button:not(:disabled)')];
+    const i = lista.indexOf(document.activeElement as HTMLElement);
+    if (i < 0 && this.root.contains(document.activeElement)) return; // cartão ou título com foco: a ordem natural continua dali
+    const alvo = tabWrap(i, lista.length, e.shiftKey);
+    if (alvo === null) return;
+    e.preventDefault();
+    lista[alvo].focus();
+  }
+
+  /** Se o cartão focado vai sair da tela, o foco passa ao cartão seguinte (ou ao anterior, ou ao título). */
+  private guardarFoco(antes: HoldingView, depois: HoldingView, comFoco?: string): void {
+    const ativo = document.activeElement;
+    const k = ativo instanceof HTMLElement && this.root?.contains(ativo) ? ativo.getAttribute('data-k') : null;
+    const id = comFoco ?? k?.replace(/:(card|aprovar|recusar|abrir)$/, '');
+    if (!id || id === 'titulo' || depois.pendencias.some((p) => p.id === id)) return;
+    const prox = focusAfterRemoval(antes.pendencias.filter((p) => depois.pendencias.some((d) => d.id === p.id) || p.id === id), id);
+    this.focoDepois = prox ? `${prox}:card` : 'titulo';
+  }
+
   private async load(): Promise<void> {
     if (this.view && document.hidden) return; // aba escondida: não consulta o servidor à toa
     let raw: string;
@@ -289,6 +325,7 @@ export class HoldingPanel implements UiComponent {
       next = JSON.parse(raw) as HoldingView;
     } catch {
       if (!this.root) return;
+      if (!this.semRede) this.dizer('Sem conexão com o servidor do escritório; mostrando o último estado.');
       this.semRede = true;
       this.draw();
       return;
@@ -299,7 +336,9 @@ export class HoldingPanel implements UiComponent {
     const mudou = raw !== this.raw || minuto !== this.minuto || this.sujo;
     this.raw = raw;
     this.minuto = minuto;
+    if (this.view) this.guardarFoco(this.view, next);
     this.view = next;
+    this.coins = (() => { const st = safeLocalStorage(); return st ? new Wallets(st).officeTotal() : null; })();
     const ids = new Set(next.pendencias.map((p) => p.id));
     for (const k of [...this.notes.keys()]) if (!ids.has(k)) this.notes.delete(k);
     for (const k of [...this.abertos]) if (!ids.has(k)) this.abertos.delete(k);
@@ -309,25 +348,24 @@ export class HoldingPanel implements UiComponent {
   }
 
   private dizer(texto: string): void {
-    if (this.live) this.live.textContent = texto;
-    this.ctx?.announce(texto);
+    // Uma região viva só: a global do escritório quando existe; senão a da própria janela.
+    if (this.ctx) this.ctx.announce(texto);
+    else if (this.live) this.live.textContent = texto;
   }
 
   private draw(): void {
     if (!this.root || !this.view) return;
     if (this.apertando) { this.sujo = true; return; }
     this.sujo = false;
-    if (this.semRede) this.dizer('Sem conexão com o servidor do escritório; mostrando o último estado.');
     const ativo = document.activeElement;
     const foco = this.focoDepois ?? (ativo instanceof HTMLElement && this.root.contains(ativo) ? ativo.getAttribute('data-k') : null);
     this.focoDepois = null;
-    const coins = (() => { const s = safeLocalStorage(); return s ? new Wallets(s).officeTotal() : null; })();
     const pagina = renderHolding(this.view, {
-      now: this.now(), coins, notes: this.notes, avisos: this.avisos, abertos: this.abertos, ocupados: this.ocupados,
+      now: this.now(), coins: this.coins, notes: this.notes, avisos: this.avisos, abertos: this.abertos, ocupados: this.ocupados,
       on: { acao: (p, a) => void this.acao(p, a), abrir: (p) => this.abrir(p), lote: () => void this.lote(), bom: (t) => void this.bom(t) },
     });
     this.content.replaceChildren(...(this.semRede ? [h('p', { class: 'hold-nota hold-nota--geral', text: 'Sem conexão com o servidor do escritório. Mostrando o último estado.', role: 'alert' })] : []), pagina);
-    if (foco) (this.content.querySelector(`[data-k="${CSS.escape(foco)}"]`) as HTMLElement | null)?.focus();
+    if (foco) ((this.content.querySelector(`[data-k="${CSS.escape(foco)}"]`) ?? (this.focoDepois === null ? this.content.querySelector('[data-k="titulo"]') : null)) as HTMLElement | null)?.focus();
   }
 
   /** Abre o cartão para revisão (não decide nada) e leva o foco para ele. */
@@ -340,6 +378,8 @@ export class HoldingPanel implements UiComponent {
 
   private async acao(p: PendingItem, a: 'aprovar' | 'recusar'): Promise<void> {
     if (this.ocupados.has(p.id) || !this.view) return;
+    // O botão fica desligado durante o envio e perde o foco: guarda de quem era para devolvê-lo.
+    const tinhaFoco = document.activeElement instanceof HTMLElement && document.activeElement.getAttribute('data-k')?.startsWith(`${p.id}:`);
     this.ocupados.add(p.id);
     this.draw();
     let o: Outcome;
@@ -353,6 +393,8 @@ export class HoldingPanel implements UiComponent {
     this.ocupados.delete(p.id);
     if (!this.root || !this.view) return;
     const r = applyDecision(this.view, p.id, o);
+    this.guardarFoco(this.view, r.view, tinhaFoco ? p.id : undefined);
+    if (tinhaFoco && this.focoDepois === null) this.focoDepois = `${p.id}:card`; // o cartão ficou (aviso): foco volta a ele
     this.view = r.view;
     if (o.kind === 'ja-decidido' && r.nota) this.avisos = [r.nota];
     else if (r.nota) this.notes.set(p.id, r.nota);
@@ -367,6 +409,7 @@ export class HoldingPanel implements UiComponent {
   private async lote(): Promise<void> {
     if (!this.view || !batchState(this.view).enabled || this.ocupados.has('lote')) return;
     this.ocupados.add('lote');
+    this.draw();
     try {
       const res = await fetch('/api/pendencias/aprovar-seguros', { method: 'POST', headers: JSON_HEADERS, body: '{}' });
       const body = (await res.json().catch(() => ({}))) as { aprovados?: unknown; error?: unknown };
