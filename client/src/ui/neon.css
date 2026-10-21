@@ -1,0 +1,110 @@
+/* Tokens néon (mockup aprovado do painel da holding) e o estilo do painel. Reutilizáveis: qualquer tela pode usar as variáveis. */
+:root {
+  --neon-noite: #1a0f2e;
+  --neon-roxo: #2a1452;
+  --neon-profundo: #0d0620;
+  --neon-rosa: #ff4fa3;
+  --neon-turquesa: #3ad3d0;
+  --neon-amarelo: #ffd23f;
+  --neon-lima: #7cff6b;
+  --neon-branco: #ffffff;
+  --neon-lilas: #a99cc9;
+  --neon-borda: 3px solid var(--neon-branco);
+  /* Sombra em degrau, sem blur. */
+  --neon-degrau: 0 4px 0 var(--neon-profundo);
+  --neon-fonte-titulo: 'Pixelify Sans', system-ui, sans-serif;
+  --neon-fonte-corpo: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.hold { position: fixed; inset: 0; z-index: 900; display: flex; flex-direction: column; gap: 10px; padding: 14px 18px; background: var(--neon-noite); color: var(--neon-branco); font-family: var(--neon-fonte-corpo); overflow-y: auto; }
+.hold *, .hold *::before, .hold *::after { box-sizing: border-box; }
+.hold-head { display: flex; align-items: center; gap: 14px; max-width: 980px; width: 100%; margin: 0 auto; }
+.hold-h1 { margin: 0; flex: 1; font-family: var(--neon-fonte-titulo); font-size: 26px; font-weight: 700; color: var(--neon-branco); }
+.hold-content { max-width: 980px; width: 100%; margin: 0 auto; padding-bottom: 40px; }
+.hold-page { display: flex; flex-direction: column; gap: 14px; }
+.hold-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.hold-btn { font: 800 13px var(--neon-fonte-corpo); min-height: 36px; padding: 7px 14px; color: var(--neon-branco); background: var(--neon-roxo); border: var(--neon-borda); border-radius: 10px; box-shadow: var(--neon-degrau); cursor: pointer; white-space: nowrap; }
+.hold-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--neon-profundo); }
+.hold-btn:disabled { opacity: 0.6; cursor: progress; }
+.hold-btn--lima { background: var(--neon-lima); color: var(--neon-noite); }
+.hold-btn--turquesa { background: var(--neon-turquesa); color: var(--neon-noite); }
+.hold-btn--rosa { background: var(--neon-rosa); color: var(--neon-noite); }
+.hold-btn--roxo { background: var(--neon-roxo); color: var(--neon-branco); }
+.hold-btn--mini { min-height: 30px; padding: 4px 10px; }
+.hold-btn kbd, .hold-todos kbd { font: 800 10px var(--neon-fonte-corpo); background: rgba(0, 0, 0, 0.25); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.hold button:focus-visible, .hold [tabindex]:focus-visible { outline: 3px solid var(--neon-amarelo); outline-offset: 3px; }
+
+.hold-hero { background: var(--neon-roxo); border: 3px solid var(--neon-amarelo); border-radius: 14px; padding: 14px; box-shadow: 0 6px 0 var(--neon-profundo); }
+.hold-hh { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 6px; }
+.hold-h2 { margin: 0; font-family: var(--neon-fonte-titulo); font-size: 24px; font-weight: 700; color: var(--neon-amarelo); }
+.hold-hh small { color: var(--neon-lilas); font-size: 13px; }
+.hold-todos { margin-left: auto; align-self: center; }
+.hold-h3 { margin: 0 0 6px; font-family: var(--neon-fonte-titulo); font-size: 16px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--neon-branco); }
+.hold-vazio { margin: 6px 0; color: var(--neon-lilas); font-size: 14px; }
+
+.hold-card { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--neon-noite); border: var(--neon-borda); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+.hold-card.is-urgent { border-color: var(--neon-rosa); }
+.hold-av { width: 38px; height: 38px; border: var(--neon-borda); border-radius: 10px; display: grid; place-items: center; font: 800 15px var(--neon-fonte-corpo); color: var(--neon-noite); }
+.hold-av--rosa { background: var(--neon-rosa); }
+.hold-av--turquesa { background: var(--neon-turquesa); }
+.hold-av--amarelo { background: var(--neon-amarelo); }
+.hold-av--lima { background: var(--neon-lima); }
+.hold-card__corpo { min-width: 0; }
+.hold-quem { font-size: 12px; color: var(--neon-lilas); }
+.hold-t { font: 800 15px var(--neon-fonte-corpo); overflow-wrap: anywhere; }
+.hold-d { font-size: 13px; margin-top: 2px; color: #e9e3f7; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hold-card.is-aberto .hold-d { display: block; overflow: visible; }
+.hold-meta { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.hold-tag { font: 800 11px var(--neon-fonte-corpo); padding: 2px 8px; border-radius: 999px; border: 2px solid var(--neon-branco); color: var(--neon-branco); }
+.hold-tag--risco { background: var(--neon-rosa); color: var(--neon-noite); }
+.hold-tag--aviso { background: var(--neon-amarelo); color: var(--neon-noite); }
+.hold-tag--neutra { background: transparent; }
+.hold-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.hold-aguarda { margin: 0; font: 800 12px var(--neon-fonte-corpo); color: var(--neon-amarelo); }
+.hold-nota { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: var(--neon-amarelo); }
+.hold-nota--geral { margin: 6px 0; }
+
+.hold-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.hold-kpi { background: var(--neon-roxo); border: var(--neon-borda); border-radius: 12px; padding: 10px 12px; box-shadow: var(--neon-degrau); min-width: 0; }
+.hold-kpi b { display: flex; align-items: center; gap: 8px; font: 800 24px var(--neon-fonte-corpo); }
+.hold-kpi span { font: 700 11px var(--neon-fonte-corpo); letter-spacing: 0.05em; color: #e9e3f7; overflow-wrap: anywhere; }
+.hold-two { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; }
+.hold-pn { background: var(--neon-roxo); border: var(--neon-borda); border-radius: 12px; padding: 12px; box-shadow: var(--neon-degrau); min-width: 0; }
+.hold-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 0; border-top: 2px dashed rgba(255, 255, 255, 0.2); font-size: 14px; }
+.hold-row:first-of-type { border-top: 0; }
+.hold-row__t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.hold-row small { color: var(--neon-lilas); font-size: 12px; }
+.hold-row--falha { color: var(--neon-rosa); font-weight: 800; }
+.hold-bar { height: 10px; width: 80px; border: 2px solid var(--neon-branco); border-radius: 6px; background: var(--neon-profundo); overflow: hidden; }
+.hold-bar i { display: block; height: 100%; background: var(--neon-turquesa); }
+.hold-ticker { background: var(--neon-profundo); border: var(--neon-borda); border-radius: 10px; padding: 8px 12px; font: 700 13px var(--neon-fonte-corpo); color: var(--neon-turquesa); }
+.hold-ticker__i { padding: 2px 0; overflow-wrap: anywhere; }
+
+/* Estado: cor + forma + texto (a forma e a cor vêm daqui, o texto fica no elemento ao lado). */
+.hold-marca { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 12px; }
+.hold-forma { display: inline-block; width: 12px; height: 12px; flex: none; border: 2px solid var(--neon-branco); }
+.hold-forma--circulo { border-radius: 50%; }
+.hold-forma--losango { transform: rotate(45deg) scale(0.85); }
+.hold-forma--triangulo { border: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.hold-cor--lima { background: var(--neon-lima); }
+.hold-cor--amarelo { background: var(--neon-amarelo); }
+.hold-cor--turquesa { background: var(--neon-turquesa); }
+.hold-cor--lilas { background: var(--neon-lilas); }
+.hold-cor--rosa { background: var(--neon-rosa); }
+.hold-cor--lima-txt { color: var(--neon-lima); }
+.hold-cor--rosa-txt { color: var(--neon-rosa); }
+.hold-cor--turquesa-txt { color: var(--neon-turquesa); }
+.hold-cor--amarelo-txt { color: var(--neon-amarelo); }
+.hold-cor--lilas-txt { color: var(--neon-lilas); }
+
+@media (max-width: 640px) {
+  .hold { padding: 10px 12px; }
+  .hold-card { grid-template-columns: auto 1fr; }
+  .hold-acts { grid-column: 1 / -1; justify-content: stretch; }
+  .hold-acts .hold-btn { flex: 1; }
+  .hold-strip { grid-template-columns: 1fr 1fr; }
+  .hold-two { grid-template-columns: 1fr; }
+  .hold-todos { margin-left: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .hold-btn:active:not(:disabled) { transform: none; } }

@@ -158,6 +158,7 @@ export async function approve(id) {
     enqueue(t.agent, PRIORITY.task, () => runDev(id)).catch(() => {});
     return { ok: true };
   }
+  update(id, { dev: { ...t.dev, awaiting: false } }); // reserva antes do primeiro await: uma segunda aprovação leva 409 e não comita em dobro
   try {
     await git(t.project, 'add', '-A');
     const staged = (await git(t.project, 'diff', '--cached', '--name-only')).trim();
@@ -171,6 +172,7 @@ export async function approve(id) {
     addActivity({ kind: 'task', agent: t.agent, agentName: agent?.name ?? '', room: agent?.room ?? '', task: id, text: `Commit ${hash || '(nada a commitar)'}: ${t.title}` });
     return { ok: true, commit: hash };
   } catch (e) {
+    update(id, { dev: { ...t.dev, awaiting: true } }); // não commitou: volta a esperar o dono
     return { ok: false, status: 500, error: `não consegui commitar: ${e.message}` };
   }
 }

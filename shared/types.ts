@@ -751,3 +751,70 @@ export interface InboxMessage {
   /** O texto como foi digitado: o plugin o manda à sessão como se você o tivesse digitado. */
   text: string;
 }
+
+// ------------------------------------------------------------------ painel da holding
+
+/** Papel de quem usa o painel da holding. */
+export type Papel = 'dono' | 'equipe';
+
+/** Item que espera decisão (buildPending em server/core/pendencias.mjs). Texto vindo de agente é dado, nunca HTML. */
+export interface PendingItem {
+  /** `${kind}:${ref}` */
+  id: string;
+  kind: 'tarefa' | 'terminal' | 'proposta' | 'chamada';
+  ref: string;
+  /** Etapa da tarefa (plan, implement, test). */
+  stage?: string;
+  agent: string;
+  title: string;
+  text: string;
+  /** Ms desde quando espera. */
+  since: number;
+  urgent: boolean;
+  cost: boolean;
+  reversible: boolean;
+  sendsMessage: boolean;
+  ownerOnly: boolean;
+  needsDialog: boolean;
+  /** Só itens seguros entram no lote; o servidor recalcula, nunca confia no cliente. */
+  safe: boolean;
+}
+
+/** Tarefa concluída que ainda não recebeu "ficou bom". */
+export interface HoldingAvaliar {
+  task: string;
+  agent: string;
+  title: string;
+  doneAt: number;
+}
+
+export type RotinaEstado = 'ok' | 'falhou' | 'pausada' | 'aguarda';
+
+export interface HoldingRotina {
+  id: string;
+  title: string;
+  agent: string;
+  whenLabel: string;
+  estado: RotinaEstado;
+  /** Fim da última execução, em ms. */
+  ultima?: number;
+}
+
+export interface HoldingElenco {
+  agent: string;
+  xp: number;
+  nivel: number;
+  /** Fração (0 a 1, exclusivo) até o próximo nível. */
+  progresso: number;
+}
+
+/** Resposta de GET /api/holding (buildHolding em server/core/holding.mjs, mais `papel` acrescentado pela rota). */
+export interface HoldingView {
+  pendencias: PendingItem[];
+  avaliar: HoldingAvaliar[];
+  rotinas: { rodaram: number; falharam: number; previstas: number; lista: HoldingRotina[] };
+  elenco: HoldingElenco[];
+  xpHoje: number;
+  ticker: { at: number; text: string }[];
+  papel: Papel;
+}

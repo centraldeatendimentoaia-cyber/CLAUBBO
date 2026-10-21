@@ -9,3 +9,5 @@ JMAL/
 .env*
 *.log
 .vitest/
+.superpowers/
+tsconfig.tsbuildinfo

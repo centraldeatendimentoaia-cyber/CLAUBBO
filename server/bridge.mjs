@@ -48,7 +48,11 @@ import { MAX_FILE, openById, saveFile } from './core/entregas.mjs';
 import { inService } from './core/hours.mjs';
 import { cleanFolder, cleanSystem, stripSystem } from './core/system-config.mjs';
 import { IPV4, PHONE_WRITES, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
+import { loadTeam } from './core/equipe.mjs';
+import { buildPending, decisionOf, rememberDecision } from './core/pendencias.mjs';
+import { buildHolding, confirmarAntesDeAgir, dispensaJanela, lotesSeguros, podeDecidir, reservarEntrega } from './core/holding.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
+import * as xp from './core/xp.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -361,8 +365,34 @@ let access = null; // tokens da instalação (data/acesso.json), lidos na subida
 /** Quem usa o token `agentes` (servidor MCP cli-agents) só cria coisas que esperam o OK do João. */
 const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-calls)$/;
 /** Pede o "sim" de uma pessoa diante do computador (janela do Windows). Recusado: já responde o erro e devolve false. */
-/** Vindo do celular (já passou pelo token do QR code) numa rota de aprovar/recusar, quem decide é a pessoa no celular: não abre a janela. Qualquer outra escrita do celular ainda pede o "sim" no computador. */
-const human = async (res, what) => { const r = fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
+/** A janela só é dispensada para o dono no celular numa rota de aprovar/recusar, ou para item que não pede janela (`pid`; item desconhecido sempre abre). `sempre` ("para sempre") e qualquer outra escrita sempre abrem. */
+const human = async (res, what, pid, { sempre = false } = {}) => {
+  const req = res.req;
+  const item = pid ? pendingNow().find((x) => x.id === pid) : undefined;
+  const dispensa = dispensaJanela({ rede: fromNetwork(req), ehEscritaDoCelular: PHONE_WRITES.test(new URL(req.url, 'http://x').pathname), pessoa: req.pessoa, sempre, item });
+  const r = dispensa ? { ok: true } : await confirmHuman(what);
+  if (!r.ok) json(res, r.status, { error: r.error });
+  return r.ok;
+};
+const TICKER_LIDO = 12;
+/** Tudo que espera decisão agora, com o risco de cada item. */
+const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
+/** Quem pode decidir o item `pid`: só dono e equipe (qualquer outro papel é negado); equipe não decide o que é só do dono; item já decidido por outra pessoa dá 409. Devolve `{ stage }` (o estágio classificado, para `recheck`) ou false (já respondeu). */
+const gatePending = (req, res, pid) => {
+  const papel = req.pessoa?.papel;
+  if (papel !== 'dono' && papel !== 'equipe') { json(res, 403, { error: 'sem permissão para decidir' }); return false; }
+  const item = pendingNow().find((x) => x.id === pid);
+  if (item && !podeDecidir(req.pessoa, item)) { json(res, 403, { error: 'só o dono pode decidir isto' }); return false; }
+  const feito = item ? null : decisionOf(pid);
+  if (feito) { json(res, 409, { error: `já decidido por ${feito.nome}` }); return false; }
+  return { stage: item?.stage };
+};
+/** Depois de cada await entre o gate e a ação: o item segue pendente no mesmo estágio e a pessoa ainda pode decidi-lo? false = já respondeu. */
+const recheck = (req, res, pid, gate) => {
+  const r = confirmarAntesDeAgir({ pendingNow, pid, pessoa: req.pessoa, estagio: gate.stage, decisionOf });
+  if (!r.ok) json(res, r.status, { error: r.error });
+  return r.ok;
+};
 /** Cadastro/troca do sistema de um agente: valida e mostra ao João o comando JÁ normalizado e a pasta. false = já respondeu. */
 const gateSystem = async (res, body, who) => {
   if (body.system === undefined) return true;
@@ -484,12 +514,14 @@ async function route(req, res, url) {
     const role = fromNetwork(req) ? 'celular' : roleOf(req, access, PORT); // rede: o phoneGate já exigiu o cookie do QR code e só deixa aprovar/recusar
     if (!role) return json(res, 403, { error: 'token de acesso ausente ou inválido: recarregue a página do Escritório' });
     if (role === 'agentes' && !(method === 'POST' && AGENT_ROUTES.test(p))) return json(res, 403, { error: 'o token dos agentes só vale para criar pedidos e propostas' });
-    if (shouldAudit(method, p)) res.on('finish', () => auditRecord(config.data, { who: role, method, path: p, status: res.statusCode }));
+    if (role === 'agentes') req.pessoa = { nome: 'agentes', papel: 'agente' };
+    if (shouldAudit(method, p)) res.on('finish', () => auditRecord(config.data, { who: role, nome: req.pessoa?.nome, method, path: p, status: res.statusCode }));
   }
 
   // ---- permissões pedidas por terminais do Claude Code (andar 2): quem decide é a página, a entrega é do Claubbo original
   if ((m = /^\/api\/permissions\/([^/]+)(\/decision)?$/.exec(p))) {
     if (m[2] && !pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode decidir' });
+    if (m[2] && req.pessoa?.papel !== 'dono') return json(res, 403, { error: 'só o dono pode liberar permissões de terminal' });
     const body = method === 'POST' ? await readBody(req) : undefined;
     if (m[2] && body?.behavior !== 'deny' && body?.behavior !== 'terminal' && !(await human(res, `Liberar uma permissão pedida por um terminal do Claude Code (pedido ${clip(m[1], 40)}, resposta: ${clip(body?.behavior, 20)})?`))) return;
     const r = await habCall(`/api/permissions/${encodeURIComponent(m[1])}${m[2] || ''}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }).catch(() => null);
@@ -732,12 +764,52 @@ ${logs}` : ''}`;
       return r.ok ? json(res, 200, r) : fail(res, r);
     }
   }
+  if (p === '/api/holding' && method === 'GET') {
+    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xp.lerXp() }), papel: req.pessoa.papel });
+  }
+  if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: xp.elenco(), xpHoje: xp.xpHoje() });
+  if (p === '/api/xp/ficou-bom' && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode avaliar' });
+    const body = await readBody(req);
+    // Nada assíncrono depois do corpo: a tarefa é lida do servidor e o XP é concedido na mesma passada síncrona.
+    const r = xp.ficouBom({ pessoa: req.pessoa, taskId: body?.task, tasks: listTasks(), getAgent });
+    return r.ok ? json(res, 200, { ok: true, duplicado: r.duplicado, agent: r.agent, xp: r.xp }) : json(res, r.status, { error: r.error });
+  }
+  if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    if (req.pessoa?.papel !== 'dono' && req.pessoa?.papel !== 'equipe') return json(res, 403, { error: 'sem permissão para decidir' });
+    const aprovados = [];
+    // O conjunto seguro é recalculado aqui; o corpo do pedido é ignorado. Cada item é conferido de novo antes de aprovar (sem janela: só entram itens sem needsDialog).
+    for (const { id: pid } of lotesSeguros(pendingNow())) {
+      const item = pendingNow().find((x) => x.id === pid);
+      if (!item?.safe || item.needsDialog || !podeDecidir(req.pessoa, item)) continue;
+      let ok = false;
+      if (item.kind === 'tarefa') ok = (await approve(item.ref)).ok; // chamada tem custo (cost:true), nunca é safe: hoje só tarefa de plano entra no lote
+      if (!ok) continue;
+      rememberDecision(pid, req.pessoa.nome);
+      auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/pendencias/aprovar-seguros#${pid}`, status: 200 });
+      aprovados.push(pid);
+    }
+    if (aprovados.length) pollSoon();
+    return json(res, 200, { aprovados });
+  }
   if (p === '/api/ops/tasks' && method === 'POST') { const r = createTask(await readBody(req)); if (!r.ok) return fail(res, r); pollSoon(); return json(res, 201, r.task); }
   if ((m = /^\/api\/ops\/tasks\/([^/]+)\/(approve|reject|retry)$/.exec(p)) && method === 'POST') {
-    if (m[2] !== 'retry' && !pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar ou recusar' });
-    const body = await readBody(req);
-    if (m[2] === 'approve' && !(await human(res, taskApproveText(listTasks().find((x) => x.id === m[1]))))) return;
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar, recusar ou repetir' });
+    const pid = `tarefa:${m[1]}`;
+    const body = await readBody(req); // antes do gate: nada assíncrono entre classificar e agir além do diálogo
+    const comFerramentas = m[2] === 'retry' && (Array.isArray(body.allow) ? body.allow.length > 0 : !!body.allow); // repetir liberando ferramentas amplia o poder da tarefa
+    if (comFerramentas) {
+      if (req.pessoa?.papel !== 'dono') return json(res, 403, { error: 'só o dono pode liberar ferramentas numa tarefa' });
+      if (!(await human(res, `Repetir a tarefa ${clip(m[1], 40)} liberando ferramentas: ${clip(JSON.stringify(body.allow), 200)}?`))) return;
+    }
+    const gate = m[2] === 'retry' ? true : gatePending(req, res, pid);
+    if (!gate) return;
+    if (m[2] === 'approve' && !(await human(res, taskApproveText(listTasks().find((x) => x.id === m[1])), pid))) return;
+    if (m[2] !== 'retry' && !recheck(req, res, pid, gate)) return; // o estágio pode ter mudado durante o diálogo
+    if (m[2] === 'approve') rememberDecision(pid, req.pessoa.nome); // antes do await de approve(): quem chegar depois leva 409 com o nome
     const r = m[2] === 'approve' ? await approve(m[1]) : m[2] === 'reject' ? reject(m[1], body.feedback) : retryWithTools(m[1], body.allow);
+    if (r.ok && m[2] === 'reject') rememberDecision(pid, req.pessoa.nome);
     pollSoon();
     return r.ok ? json(res, 200, { ok: true, ...(r.commit !== undefined ? { commit: r.commit } : {}), ...(r.task ? { task: r.task } : {}) }) : fail(res, r);
   }
@@ -824,11 +896,16 @@ ${logs}` : ''}`;
   }
   if ((m = /^\/api\/cli\/requests\/([^/]+)\/(approve|reject)$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    const pid = `terminal:${m[1]}`;
+    const gate = gatePending(req, res, pid);
+    if (!gate) return;
     const item = cliRequests.find((r) => r.id === m[1]);
     if (!item || item.state !== 'pending') return json(res, 404, { error: 'pedido não está esperando aprovação' });
-    if (m[2] === 'reject') { item.state = 'rejected'; saveCli(); return json(res, 200, item); }
-    if (!(await human(res, `Enviar ao terminal "${clip(item.agentName, 40)}" o pedido de ${clip(item.from, 40)}: ${clip(item.text, 500)}`))) return;
-    if (item.state !== 'pending') return json(res, 409, { error: 'o pedido mudou enquanto a confirmação estava aberta' });
+    if (m[2] === 'reject') { item.state = 'rejected'; saveCli(); rememberDecision(pid, req.pessoa.nome); return json(res, 200, item); }
+    if (!(await human(res, `Enviar ao terminal "${clip(item.agentName, 40)}" o pedido de ${clip(item.from, 40)}: ${clip(item.text, 500)}`, pid))) return;
+    if (!recheck(req, res, pid, gate)) return;
+    const rs = reservarEntrega(item, pid, req.pessoa.nome, rememberDecision, decisionOf); // síncrono: a segunda decisão não entrega de novo
+    if (!rs.ok) return json(res, rs.status, { error: rs.error });
     await deliverCli(item);
     return json(res, 200, item);
   }
@@ -879,14 +956,19 @@ ${logs}` : ''}`;
   }
   if ((m = /^\/api\/agent-proposals\/([^/]+)\/(approve|reject)$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    const pid = `proposta:${m[1]}`;
+    const gate = gatePending(req, res, pid);
+    if (!gate) return;
     const item = agentProposals.find((r) => r.id === m[1]);
     if (!item || item.state !== 'pending') return json(res, 404, { error: 'proposta não está esperando aprovação' });
     if (m[2] === 'approve' && !(await human(res, item.delete ? `EXCLUIR o agente ${clip(item.name, 40)} (permanente)?` : `Criar o agente ${clip(item.agent?.name, 40)} (${clip(item.agent?.role, 80)}) com as ferramentas: ${clip((item.agent?.tools || []).join(', ') || 'nenhuma', 120)}?`))) return;
     if (item.state !== 'pending') return json(res, 409, { error: 'a proposta mudou enquanto a confirmação estava aberta' });
+    if (!recheck(req, res, pid, gate)) return;
     if (m[2] === 'reject') item.state = 'rejected';
     else if (item.delete) { const r = deleteAgent(item.delete); item.state = r.ok ? 'deleted' : 'failed'; if (!r.ok) item.error = r.errors.join('; '); else pollSoon(); }
     else { const r = createAgent(item.agent); item.state = r.ok ? 'created' : 'failed'; if (!r.ok) item.error = r.errors.join('; '); else pollSoon(); }
     saveProps();
+    rememberDecision(pid, req.pessoa.nome);
     return json(res, 200, item);
   }
 
@@ -911,15 +993,21 @@ ${logs}` : ''}`;
   }
   if ((m = /^\/api\/agent-calls\/([^/]+)\/(approve|reject)$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
+    const pid = `chamada:${m[1]}`;
+    const gate = gatePending(req, res, pid);
+    if (!gate) return;
     const c = callStore.calls.find((x) => x.id === m[1]);
     if (!c || c.state !== 'pending') return json(res, 404, { error: 'chamada não está esperando aprovação' });
-    if (m[2] === 'reject') { c.state = 'rejected'; saveCalls(); return json(res, 200, c); }
+    if (m[2] === 'reject') { c.state = 'rejected'; saveCalls(); rememberDecision(pid, req.pessoa.nome); return json(res, 200, c); }
     if (callBusy()) return json(res, 429, { error: 'já há uma chamada em andamento' });
     const { always } = await readBody(req);
-    if (!(await human(res, `Deixar ${clip(c.fromName, 40)} chamar ${clip(c.toName, 40)}${always === true ? ' PARA SEMPRE' : ''}: ${clip(c.text, 400)}`))) return;
+    if (always === true && req.pessoa?.papel !== 'dono') return json(res, 403, { error: 'só o dono pode liberar uma chamada para sempre' });
+    if (!(await human(res, `Deixar ${clip(c.fromName, 40)} chamar ${clip(c.toName, 40)}${always === true ? ' PARA SEMPRE' : ''}: ${clip(c.text, 400)}`, pid, { sempre: always === true }))) return; // "para sempre" é um poder maior que a chamada: sempre pede o "sim"
     if (c.state !== 'pending' || callBusy()) return json(res, 409, { error: 'a chamada mudou enquanto a confirmação estava aberta' });
+    if (!recheck(req, res, pid, gate)) return;
     if (always === true && !granted(c.from, c.to)) callStore.grants.push({ from: c.from, to: c.to });
     void runCall(c);
+    rememberDecision(pid, req.pessoa.nome);
     return json(res, 200, c);
   }
 
@@ -1018,10 +1106,11 @@ export function start() {
     try {
       const url = new URL(req.url, 'http://x');
       if (fromNetwork(req)) { // celular na mesma rede: só leitura e só com o token do QR code
-        const gate = phoneGate(req, url, PHONE_TOKEN, PORT);
+        const gate = phoneGate(req, url, PHONE_TOKEN, PORT, loadTeam(config.data)); // arquivo pequeno: lido a cada pedido de rede, então um cadastro novo vale sem reiniciar
         if (gate.action === 'deny') return json(res, gate.status, { error: gate.error });
         if (gate.action === 'redirect') { res.writeHead(302, { location: gate.location, 'set-cookie': gate.cookie, 'cache-control': 'no-store' }); return res.end(); }
-      }
+        req.pessoa = gate.person;
+      } else req.pessoa = { nome: 'dono', papel: 'dono' }; // local: o computador do servidor (sem token válido, a rota devolve 403)
       if (!url.pathname.startsWith('/api/')) return serveStatic(req, res, url);
       route(req, res, url).catch((e) => { if (!res.headersSent) json(res, statusOf(e), { error: String(e.message || e) }); else res.destroy(); });
     } catch { if (!res.headersSent) json(res, 400, { error: 'endereço inválido' }); else res.destroy(); } // URL ou %-escape malformado
