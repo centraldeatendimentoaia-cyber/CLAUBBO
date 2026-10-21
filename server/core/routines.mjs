@@ -31,15 +31,15 @@ const readHistory = () => {
 /** Grava as execuções que terminaram desde a última vez. Devolve quantas linhas entraram. */
 export function recordHistory(tasks = listTasks()) {
   const seen = new Set(readHistory().map((e) => e.task));
-  const lines = [], premiar = [];
+  const lines = [];
   for (const t of tasks) {
     if (!t.routine || t.state !== 'done' || seen.has(t.id)) continue;
     const ok = !t.error;
+    // XP antes da linha: se falhar, a execução fica fora do histórico e é refeita na próxima chamada (a chave única impede duplicar).
+    if (ok && t.agent) { try { award(`rotina:${t.id}`, t.agent, XP_ROTINA, t.doneAt || Date.now()); } catch (e) { console.error(`[xp] não concedeu ${t.id}: ${e.message}`); continue; } }
     lines.push(JSON.stringify({ routine: t.routine, task: t.id, startedAt: t.startedAt || t.addedAt, finishedAt: t.doneAt || Date.now(), ok, result: String(ok ? t.result ?? '' : t.error).slice(0, 300) }));
-    if (ok && t.agent) premiar.push(t);
   }
   if (lines.length) fs.appendFileSync(historyFile(), `${lines.join('\n')}\n`);
-  for (const t of premiar) award(`rotina:${t.id}`, t.agent, XP_ROTINA, t.doneAt || Date.now()); // chave única: segunda proteção contra repetir
   return lines.length;
 }
 

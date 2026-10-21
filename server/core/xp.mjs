@@ -8,11 +8,14 @@ const TZ = 'America/Sao_Paulo';
 export const XP_FICOU_BOM = 30;
 export const XP_ROTINA = 5;
 const file = () => path.join(config.data, 'xp.json');
+// Objetos sem protótipo: um agente chamado "constructor" ou "__proto__" é só uma chave comum.
+const limpo = (o) => Object.assign(Object.create(null), o);
 const load = () => {
   const d = readJson(file(), null);
-  return { agentes: d?.agentes ?? {}, eventos: d?.eventos ?? {} };
+  return { agentes: limpo(d?.agentes), eventos: limpo(d?.eventos) };
 };
-const diaSP = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(ms);
+const fmtDia = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
+const diaSP = (ms) => fmtDia.format(ms);
 
 /** Soma `pontos` ao agente uma única vez por `key`. Síncrono de ponta a ponta: não há await entre conferir e gravar. */
 export function award(key, agent, pontos, now = Date.now()) {
@@ -26,7 +29,8 @@ export function award(key, agent, pontos, now = Date.now()) {
 
 /** nível = floor(sqrt(xp / 50)) + 1; progresso = fração (0 a 1, exclusivo) entre o início deste nível e o do próximo. */
 export function levelOf(xp) {
-  const nivel = Math.floor(Math.sqrt(Math.max(0, xp) / 50)) + 1;
+  xp = Math.max(0, xp);
+  const nivel = Math.floor(Math.sqrt(xp / 50)) + 1;
   const base = 50 * (nivel - 1) ** 2, proximo = 50 * nivel ** 2;
   return { nivel, progresso: (xp - base) / (proximo - base) };
 }

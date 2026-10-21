@@ -368,7 +368,6 @@ const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-cal
 /** Vindo do celular (já passou pelo token do QR code) numa rota de aprovar/recusar, quem decide é a pessoa no celular: não abre a janela. Qualquer outra escrita do celular ainda pede o "sim" no computador. */
 /** Com `pid` (id da pendência), a janela só abre se o item pedir (needsDialog); item desconhecido sempre abre. Sem `pid`, sempre abre. */
 const human = async (res, what, pid) => { const r = (fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname)) || (pid && pendingNow().find((x) => x.id === pid)?.needsDialog === false) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
-// XP ainda não existe (Task 4 troca isto pelo módulo real): nada a avaliar, elenco vazio.
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });

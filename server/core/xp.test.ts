@@ -47,7 +47,25 @@ describe('award', () => {
   });
 });
 
+describe('ids perigosos', () => {
+  it('agente "constructor" ou "__proto__" vira dado comum, sem corromper o arquivo', () => {
+    award('a', 'constructor', 10);
+    award('b', '__proto__', 20);
+    award('constructor', 'ana', 5);
+    expect(xpOf('constructor')).toBe(10);
+    expect(xpOf('__proto__')).toBe(20);
+    expect(xpOf('toString')).toBe(0);
+    expect(avaliada('constructor')).toBe(false);
+    expect(elenco().map((e: { agent: string }) => e.agent).sort()).toEqual(['__proto__', 'ana', 'constructor']);
+    expect(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'xp.json'), 'utf8')).agentes)).toContain('__proto__');
+  });
+});
+
 describe('levelOf', () => {
+  it('xp negativo vale como zero', () => {
+    expect(levelOf(-10)).toEqual({ nivel: 1, progresso: 0 });
+  });
+
   it('segue floor(sqrt(xp/50)) + 1 com progresso entre 0 e 1', () => {
     expect(levelOf(0).nivel).toBe(1);
     expect(levelOf(50).nivel).toBe(2);

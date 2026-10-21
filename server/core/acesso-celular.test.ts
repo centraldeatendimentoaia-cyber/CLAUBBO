@@ -7,6 +7,13 @@ const TOKEN = newPhoneToken();
 const req = (method: string, cookie = '') => ({ method, headers: cookie ? { cookie } : {} });
 const url = (p: string) => new URL(p, 'http://x');
 
+describe('modo celular e XP', () => {
+  it('celular não dá "ficou bom": POST negado com 403', () => {
+    const g = phoneGate(req('POST', ''), url('/api/xp/ficou-bom'), TOKEN, 4530);
+    expect(g).toMatchObject({ action: 'deny', status: 403 });
+  });
+});
+
 describe('modo celular', () => {
   it('aceita o IP da rede no Host só quando o modo celular está ligado', () => {
     expect(hostAllowed('192.168.0.10:4530', 4530)).toBe(false);
