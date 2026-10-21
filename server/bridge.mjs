@@ -47,13 +47,16 @@ import { events } from './core/events.mjs';
 import { MAX_FILE, openById, saveFile } from './core/entregas.mjs';
 import { inService } from './core/hours.mjs';
 import { cleanFolder, cleanSystem, stripSystem } from './core/system-config.mjs';
-import { confirmHuman, hostAllowed, humanGated, loadAccess, roleOf, sessionCookie } from './core/acesso.mjs';
+import { IPV4, confirmHuman, hostAllowed, humanGated, isLoopback, loadAccess, newPhoneToken, phoneGate, roleOf, sessionCookie } from './core/acesso.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT = path.join(HERE, '..', 'dist', 'client');
 const PORT = Number(process.env.BRIDGE_PORT || 4530);
+const LAN_HOST = IPV4.test(process.env.V2_LAN_HOST || '') ? process.env.V2_LAN_HOST : ''; // modo celular: IP do computador no Wi-Fi
+const PHONE_TOKEN = LAN_HOST ? newPhoneToken() : '';
+const fromNetwork = (req) => !!LAN_HOST && !isLoopback(req.socket?.remoteAddress);
 const HAB = process.env.CLAUBBO_URL || 'http://127.0.0.1:4747'; // Claubbo original: terminais do Claude Code (andar 2)
 const POLL_MS = 1500;
 const STARTED = Date.now();
@@ -458,7 +461,7 @@ function serveStatic(req, res, url) {
   if (!file.startsWith(CLIENT)) return json(res, 403, { error: 'proibido' });
   if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(CLIENT, 'index.html');
   // o HTML nunca fica em cache (aponta para o bundle com hash do build atual); os arquivos com hash no nome podem
-  res.writeHead(200, { 'content-type': MIME[path.extname(file)] || (path.basename(file) === 'LICENSE' ? 'text/plain; charset=utf-8' : 'application/octet-stream'), ...(path.extname(file) === '.html' ? { 'cache-control': 'no-cache', 'set-cookie': sessionCookie(access, PORT) } : {}) });
+  res.writeHead(200, { 'content-type': MIME[path.extname(file)] || (path.basename(file) === 'LICENSE' ? 'text/plain; charset=utf-8' : 'application/octet-stream'), ...(path.extname(file) === '.html' ? { 'cache-control': 'no-cache', ...(fromNetwork(req) ? {} : { 'set-cookie': sessionCookie(access, PORT) }) } : {}) });
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res); // arquivo sumiu no meio (rebuild): corta a resposta em vez de derrubar o servidor
 }
 
@@ -1009,9 +1012,14 @@ export function start() {
   if (process.env.V2_CONFIRMACAO === 'sim') console.warn('ATENÇÃO: V2_CONFIRMACAO=sim desliga a confirmação humana das aprovações (só para testes).');
   const server = http.createServer((req, res) => {
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
-    if (!hostAllowed(req.headers.host, PORT)) return json(res, 403, { error: 'host não permitido: use http://127.0.0.1:' + PORT }); // barra DNS rebinding
+    if (!hostAllowed(req.headers.host, PORT, LAN_HOST)) return json(res, 403, { error: 'host não permitido: use http://127.0.0.1:' + PORT }); // barra DNS rebinding
     try {
       const url = new URL(req.url, 'http://x');
+      if (fromNetwork(req)) { // celular na mesma rede: só leitura e só com o token do QR code
+        const gate = phoneGate(req, url, PHONE_TOKEN, PORT);
+        if (gate.action === 'deny') return json(res, gate.status, { error: gate.error });
+        if (gate.action === 'redirect') { res.writeHead(302, { location: gate.location, 'set-cookie': gate.cookie, 'cache-control': 'no-store' }); return res.end(); }
+      }
       if (!url.pathname.startsWith('/api/')) return serveStatic(req, res, url);
       route(req, res, url).catch((e) => { if (!res.headersSent) json(res, statusOf(e), { error: String(e.message || e) }); else res.destroy(); });
     } catch { if (!res.headersSent) json(res, 400, { error: 'endereço inválido' }); else res.destroy(); } // URL ou %-escape malformado
@@ -1021,7 +1029,16 @@ export function start() {
   setInterval(() => poll().catch(() => {}), POLL_MS).unref?.();
   setInterval(checkReturns, 3000).unref?.();
   if (process.env.V2_TELEGRAM !== 'off') telegramBot.start(); // V2_TELEGRAM=off: instância de teste não disputa o bot com a 4530
-  server.listen(PORT, '127.0.0.1', () => console.log(`Escritório v2 em http://127.0.0.1:${PORT}`));
+  server.listen(PORT, LAN_HOST ? '0.0.0.0' : '127.0.0.1', () => {
+    console.log(`Escritório v2 em http://127.0.0.1:${PORT}`);
+    if (!LAN_HOST) return;
+    const file = path.join(config.data, 'celular.txt'); // o endereço com o token fica só neste arquivo (0600) e some quando o servidor para
+    fs.writeFileSync(file, `http://${LAN_HOST}:${PORT}/?t=${PHONE_TOKEN}
+`, { mode: 0o600 });
+    process.on('exit', () => { try { fs.unlinkSync(file); } catch { /* já sumiu */ } });
+    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
+    console.log(`Celular liberado (somente leitura): o endereço com o token está em ${file}`);
+  });
   return server;
 }
 

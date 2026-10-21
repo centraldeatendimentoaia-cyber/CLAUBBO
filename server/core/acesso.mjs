@@ -53,7 +53,30 @@ export function roleOf(req, access, port) {
 }
 
 /** Host aceito: só o próprio computador, com a porta do servidor. */
-export const hostAllowed = (host, port) => [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`].includes(String(host || '').toLowerCase());
+/** `lanHost` (IP da rede local, só no modo celular) também é aceito. */
+export const hostAllowed = (host, port, lanHost = '') => [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`, ...(lanHost ? [`${lanHost}:${port}`] : [])].includes(String(host || '').toLowerCase());
+
+// ---------------------------------------------------------------- modo celular
+// V2_LAN_HOST=<IP do computador no Wi-Fi> abre o servidor para a rede local, SÓ para leitura: quem vem de fora do computador precisa
+// do token do celular (nasce a cada subida, vai no QR code), nunca recebe o token da página e não consegue escrever nada.
+export const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/;
+export const isLoopback = (addr) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(String(addr || ''));
+export const phoneCookieName = (port) => `v2_cel_${port}`;
+export const newPhoneToken = () => crypto.randomBytes(24).toString('hex');
+
+/** Decide uma requisição que veio da rede: 'deny' (com motivo), 'redirect' (primeira visita, grava o cookie e tira o token da URL) ou 'allow'. */
+export function phoneGate(req, url, token, port) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return { action: 'deny', status: 403, error: 'celular: somente leitura' };
+  const given = url.searchParams.get('t');
+  if (given && token && same(given, token)) {
+    url.searchParams.delete('t');
+    const clean = url.pathname + (url.search || '');
+    return { action: 'redirect', location: clean, cookie: `${phoneCookieName(port)}=${token}; HttpOnly; SameSite=Strict; Path=/` };
+  }
+  const cookie = readCookie(req, phoneCookieName(port));
+  if (cookie && token && same(cookie, token)) return { action: 'allow' };
+  return { action: 'deny', status: 403, error: 'celular: abra o endereço pelo QR code mostrado no computador' };
+}
 
 // ---------------------------------------------------------------- confirmação humana
 let open = false, lockedUntil = 0;
