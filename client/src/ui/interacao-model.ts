@@ -1,5 +1,6 @@
 // Modelo puro do menu de interação do boneco (sem DOM): quais ações existem para um agente ou para o elevador, quais
 // estão apagadas e por quê. Quem decide de verdade é o servidor (papel, 409); aqui só se explica ao jogador.
+import type { AppearanceParts } from '../../../shared/appearance';
 import { ESCADAS_AURA } from '../world/render/aura';
 
 export type Acao = 'conversar' | 'desafiar' | 'btw' | 'agradecer' | 'subir' | 'descer' | 'andar';
@@ -108,10 +109,16 @@ export function criarGuarda() {
   };
 }
 
-export const ESPERA_LIGAR_MS = 30_000;
-export const TENTATIVAS_LIGAR = 3;
-
-/** Depois de uma tentativa de ligar o boneco que falhou: sempre espera 30 s; na terceira falha desiste até recarregar a página. */
-export function aposFalhaDeLigar(falhas: number, agora: number): { desistiu: boolean; naoAntesDe: number } {
-  return { desistiu: falhas >= TENTATIVAS_LIGAR, naoAntesDe: agora + ESPERA_LIGAR_MS };
+/**
+ * A aparência do boneco: a do World quando existe; senão o padrão (sem `parts`, o desenho usa o visual de sempre pela
+ * semente do nome). `look` fixo e estável por nome; sem nome, "Você".
+ */
+export function aparenciaDoJogador(
+  me?: { name: string; look: 'f' | 'm'; parts?: AppearanceParts },
+  nome?: string,
+): { name: string; look: 'f' | 'm'; parts?: AppearanceParts } {
+  if (me) return { name: me.name, look: me.look, ...(me.parts ? { parts: me.parts } : {}) };
+  const n = nome?.trim() || 'Você';
+  const soma = [...n].reduce((t, c) => t + c.charCodeAt(0), 0);
+  return { name: n, look: soma % 2 === 0 ? 'f' : 'm' };
 }

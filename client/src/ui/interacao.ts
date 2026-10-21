@@ -4,11 +4,12 @@
 // Todos os papéis veem as mesmas ações: quem decide (403, 409) é o servidor.
 import { getFloor } from '../floor';
 import { agradecer, obrigadosPossiveis, perguntarBtw, trocarModelo } from '../net/interacao-api';
+import type { WorldSceneMe } from '../../../shared/world/api';
 import type { Alvo } from '../world/player';
 import type { PlayerWorld } from '../world/api';
 import type { UiContext } from './context';
 import { h } from './dom';
-import { aposFalhaDeLigar, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
+import { aparenciaDoJogador, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
 
 const BTW_MAX = 500;
 
@@ -62,49 +63,49 @@ export class Interacao {
   // ---------------------------------------------------------------- ligar o boneco
 
   private tentando = false;
-  private falhas = 0;
-  private desistiu = false;
-  private naoAntesDe = 0;
 
   /**
-   * A aparência (`me`) vem do stream do mundo, a mesma fonte da cena Visita; o stream abre só para ler e fecha em seguida.
-   * Falhou: espera 30 s antes de tentar de novo e, na terceira falha, desiste até recarregar a página (nunca conecta e fecha em laço).
+   * O boneco liga sempre que o escritório está ativo, com ou sem conta do World. Com o World disponível, a aparência
+   * (`me`) vem do stream do mundo (a mesma fonte da cena Visita), que abre só para ler e fecha em seguida; sem World, ou
+   * se o stream falhar ou demorar mais de 20 s, vale a aparência padrão (aparenciaDoJogador). Nunca tenta de novo em laço.
    */
   private tentarLigar(): void {
-    if (this.ligado || this.tentando || this.desistiu || Date.now() < this.naoAntesDe || !this.ctx.store.snapshot || !this.disponivel()) return;
+    if (this.ligado || this.tentando || !this.ctx.store.snapshot) return;
+    if (!this.disponivel()) {
+      this.ligarCom(undefined);
+      return;
+    }
     this.tentando = true;
     let acabou = false;
     let off: () => void = () => {};
     let stream: { close(): void } | null = null;
     let limite: ReturnType<typeof setTimeout> | undefined;
-    const acabar = (ok: boolean): void => {
+    const acabar = (me: WorldSceneMe | undefined): void => {
       if (acabou) return;
       acabou = true;
       clearTimeout(limite);
       off();
       stream?.close();
       this.tentando = false;
-      if (!ok) {
-        const p = aposFalhaDeLigar(++this.falhas, Date.now());
-        this.desistiu = p.desistiu;
-        this.naoAntesDe = p.naoAntesDe;
-      }
+      this.ligarCom(me);
     };
-    limite = setTimeout(() => acabar(false), 20_000);
+    limite = setTimeout(() => acabar(undefined), 20_000);
     void import('../net/world-stream')
       .then((ws) => {
         if (acabou) return;
         const st = ws.createWorldStream({ mock: this.ctx.store.mock });
         stream = st;
         off = st.on((ev) => {
-          if (acabou || ev.type !== 'snapshot' || !ev.snapshot.me) return;
-          const { name, look, parts } = ev.snapshot.me;
-          this.ligado = true;
-          this.player.ligar({ name, look, parts });
-          acabar(true);
+          if (ev.type === 'snapshot' && ev.snapshot.me) acabar(ev.snapshot.me);
         });
       })
-      .catch(() => acabar(false));
+      .catch(() => acabar(undefined));
+  }
+
+  private ligarCom(me: Pick<WorldSceneMe, 'name' | 'look' | 'parts'> | undefined): void {
+    if (this.ligado) return;
+    this.ligado = true;
+    this.player.ligar(aparenciaDoJogador(me));
   }
 
   // ---------------------------------------------------------------- dica e menu aberto: um laço por quadro

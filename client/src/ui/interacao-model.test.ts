@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aposFalhaDeLigar, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador } from './interacao-model';
+import { aparenciaDoJogador, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador } from './interacao-model';
 
 const base = { model: 'sonnet', provider: 'claude', status: 'idle', ocioso: true, obrigadoPossivel: true };
 const por = (itens: ReturnType<typeof menuDoAgente>, acao: string) => itens.find((i) => i.acao === acao)!;
@@ -124,9 +124,19 @@ describe('criarGuarda', () => {
   });
 });
 
-describe('aposFalhaDeLigar', () => {
-  it('espera 30 s e desiste na terceira falha', () => {
-    expect(aposFalhaDeLigar(1, 1000)).toEqual({ desistiu: false, naoAntesDe: 31_000 });
-    expect(aposFalhaDeLigar(3, 1000).desistiu).toBe(true);
+describe('aparenciaDoJogador', () => {
+  it('usa o me do World quando existe', () => {
+    expect(aparenciaDoJogador({ name: 'Ana', look: 'f', parts: {} as never })).toMatchObject({ name: 'Ana', look: 'f' });
+  });
+  it('sem World: padrão estável por nome, sem parts', () => {
+    const a = aparenciaDoJogador(undefined, 'Rui');
+    expect(a).toEqual(aparenciaDoJogador(undefined, 'Rui'));
+    expect(a.name).toBe('Rui');
+    expect(['f', 'm']).toContain(a.look);
+    expect(a.parts).toBeUndefined();
+  });
+  it('sem nome: Você', () => {
+    expect(aparenciaDoJogador().name).toBe('Você');
+    expect(aparenciaDoJogador(undefined, '  ').name).toBe('Você');
   });
 });
