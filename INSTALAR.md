@@ -35,7 +35,7 @@ Regras:
 
 3. Suba o Habblaud no Docker (é o que mostra o andar 2; não pule este passo)
 - `cd habblaud`, `npm ci` e `npm run docker:up`. Espere o `/api/health` responder em http://127.0.0.1:4747.
-- Confira com `docker ps` que o contêiner `habblaud` está de pé. Se o `docker:up` falhar, leia o erro, corrija (Docker parado, porta 4747 ocupada, falta de `npm ci` em `habblaud`) e rode de novo, até o `/api/health` responder.
+- Confira com `docker ps` que o contêiner `claubbo` está de pé. Se o `docker:up` falhar, leia o erro, corrija (Docker parado, porta 4747 ocupada, falta de `npm ci` em `habblaud`) e rode de novo, até o `/api/health` responder.
 
 4. Instale os plugins do Habblaud no Claude Code (precisa do Claude Code 2.1.287 ou mais novo)
 - Em `habblaud`: `npm run mod:install` e depois `npm run mod:status`. Instale sempre a versão completa, sem `--sem-permissoes` nem `--sem-mensagens`.

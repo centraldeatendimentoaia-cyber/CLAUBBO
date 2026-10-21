@@ -59,7 +59,7 @@ const USAGE_DIR = process.env.HABBLAUD_USAGE_DIR?.trim() ? resolve(process.env.H
 const CONTAINER_USAGE_DIR = '/usage';
 /** Onde o container lê o certificado do acesso remoto (server/http/remote.ts). */
 const CONTAINER_REMOTE_TLS_DIR = '/remote-tls';
-const SERVICE = 'habblaud';
+const SERVICE = 'claubbo';
 /** Raiz das montagens dentro do container: /claude/<conta>/{projects,sessions}. */
 const CONTAINER_ROOT = '/claude';
 /** Somente estas subpastas de cada conta entram no container. */
@@ -73,8 +73,8 @@ const CODEX_CONTAINER_ROOT = '/codex';
 export const CODEX_MOUNTED_SUBDIRS = ['sessions', 'archived_sessions', 'thread-writer-locks'] as const;
 const DEFAULT_PORT = 4747;
 const HEALTH_TIMEOUT_MS = 120_000;
-/** Imagem e volume de dados como o Compose os nomeia (`name: habblaud` no docker-compose.yml). */
-const IMAGE = 'habblaud:local';
+/** Imagem como o Compose a nomeia (`name: claubbo`) e volume de dados, com nome fixo no docker-compose.yml. */
+const IMAGE = 'claubbo:local';
 const DATA_VOLUME = 'habblaud_habblaud-data';
 /** O mesmo no CodeTown (até a 0.3.2), só para a migração: container_name fixo, rede padrão, volume e imagem. */
 const LEGACY_DOCKER = {
@@ -649,9 +649,19 @@ async function waitHealthy(baseUrl: string): Promise<Health | undefined> {
 // Comandos
 // ---------------------------------------------------------------------------------------------
 
+/** Container do tempo em que o projeto se chamava habblaud: o container_name fixo prende a porta, então sai antes do novo subir. */
+function removeOldContainer(): void {
+  const c = dockerQuiet(['container', 'inspect', '--format', '{{.Config.Image}}', 'habblaud']);
+  if (!c.ok || c.out.trim() !== 'habblaud:local') return;
+  say('Removendo o container habblaud (nome anterior; os dados continuam no volume habblaud_habblaud-data)…');
+  const res = dockerQuiet(['rm', '-f', 'habblaud']);
+  if (!res.ok) fail(`não consegui remover o container habblaud (${res.error}). Remova com docker rm -f habblaud e rode de novo.`);
+}
+
 function down(port: number): void {
   checkDocker();
   say(tr('Derrubando o container…'));
+  removeOldContainer();
   compose(['down'], port);
   say(tr('Pronto. Os nomes dos personagens continuam guardados no volume habblaud-data.'));
 }
@@ -718,6 +728,7 @@ async function up(opts: Options, port: number): Promise<void> {
   renameSync(tmp, OVERRIDE_FILE);
   say(tr('docker-compose.override.yml gerado.'));
 
+  removeOldContainer();
   const plan = planUp(inspectDocker(), opts.build);
   const { copyFailed } = runPlan(plan, port, opts.build);
 

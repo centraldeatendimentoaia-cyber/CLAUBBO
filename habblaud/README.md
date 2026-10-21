@@ -350,7 +350,7 @@ npm run mod:uninstall                       # tira o mod, os plugins de permiss�
 npm run codex:uninstall                     # tira os hooks do Habblaud do Codex (os outros ficam)
 npm run docker:down                         # para o container
 docker volume rm habblaud_habblaud-data     # apaga os dados do container (nomes, salas, linha do tempo e estatísticas)
-docker image rm habblaud:local              # apaga a imagem
+docker image rm claubbo:local              # apaga a imagem
 rm -rf ~/.habblaud                          # apaga os dados locais (uso capturado, nomes, salas, linha do tempo e estatísticas)
 ```
 

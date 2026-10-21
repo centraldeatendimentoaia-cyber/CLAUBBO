@@ -9,13 +9,13 @@
 #     /codex/<conta>/... (nunca auth.json, config.toml, history.jsonl, logs nem os bancos SQLite);
 #   - HABBLAUD_CLAUDE_DIRS, HABBLAUD_CODEX_DIRS, HABBLAUD_ACCOUNTS e HABBLAUD_USAGE_DIR.
 # O Compose mescla o override automaticamente em qualquer `docker compose ...` rodado nesta pasta.
-name: habblaud
+name: claubbo
 
 services:
-  habblaud:
+  claubbo:
     build: .
-    image: habblaud:local
-    container_name: habblaud
+    image: claubbo:local
+    container_name: claubbo
     restart: unless-stopped
     # Os transcripts são sensíveis: por padrão a porta é publicada SÓ na interface local do host
     # (HABBLAUD_BIND=0.0.0.0 no .env libera a rede local; veja o README).
@@ -70,3 +70,5 @@ services:
 
 volumes:
   habblaud-data:
+    # nome fixo: quem já usava o Habblaud mantém os dados ao trocar o projeto para claubbo
+    name: habblaud_habblaud-data

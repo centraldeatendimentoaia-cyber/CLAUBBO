@@ -199,7 +199,7 @@ describe('docker-up: migração do nome antigo (CodeTown)', () => {
     expect(args).toContain('--rm');
     expect(args.join(' ')).toContain('--user 0:0 --entrypoint sh');
     expect(args.join(' ')).toContain('--network none');
-    expect(args.join(' ')).toContain('-v velho:/from:ro -v novo:/to habblaud:local -c ');
+    expect(args.join(' ')).toContain('-v velho:/from:ro -v novo:/to claubbo:local -c ');
     const script = args.at(-1)!;
     expect(script).toMatch(/^set -e; cp -a \/from\/\. \/to\/;/);
     expect(script).toContain('chown "$(stat -c %u:%g /from)" /to');

@@ -28,7 +28,7 @@
     "i18n:check": "tsx scripts/i18n-check.ts",
     "docker:up": "tsx scripts/docker-up.ts",
     "docker:down": "tsx scripts/docker-up.ts --down",
-    "docker:logs": "docker compose logs -f habblaud",
+    "docker:logs": "docker compose logs -f claubbo",
     "usage:install": "tsx scripts/statusline-install.ts install",
     "usage:uninstall": "tsx scripts/statusline-install.ts uninstall",
     "usage:status": "tsx scripts/statusline-install.ts status",
