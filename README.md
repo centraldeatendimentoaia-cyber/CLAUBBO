@@ -4,7 +4,9 @@ Escritório local de agentes de IA, só seu, com o visual e a vida dos personage
 
 Instalação em máquina nova com um único prompt: veja [`INSTALAR.md`](INSTALAR.md).
 
-Ver o escritório no celular, no mesmo Wi-Fi e só para leitura (`V2_LAN_HOST`): veja [`CELULAR.md`](CELULAR.md).
+Atualização de uma instalação existente com um único prompt: veja [`ATUALIZAR.md`](ATUALIZAR.md).
+
+Ver o escritório no celular, no mesmo Wi-Fi, para ver e aprovar (`V2_LAN_HOST`): veja [`CELULAR.md`](CELULAR.md).
 
 ## Rodar
 
