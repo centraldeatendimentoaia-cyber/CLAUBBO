@@ -58,6 +58,16 @@ Uma página só com o que espera decisão e o que merece avaliação. Abre pelo 
 - **Janela do Windows:** aprovar item perigoso (implementação e testes de agente de código, pedidos a terminais, propostas de agentes) continua abrindo a janela de confirmação no computador do servidor, como em "Token de acesso e confirmação". Item seguro não abre janela. Pelo celular, só o dono (token do QR code) dispensa a janela nas rotas de aprovar e recusar; a equipe não libera permissões de terminal, não libera chamada "para sempre" e não repete tarefa com ferramentas liberadas.
 - **XP:** só por resultado verificado: o dono clica em "Ficou bom" numa tarefa concluída sem erro, ou uma rotina termina sem erro. Cada evento conta uma única vez (repetir o clique não soma) e volume de mensagens ou tokens nunca dá XP. O celular e a equipe não conseguem avaliar.
 
+## Boneco e auras
+
+Você tem um boneco no mapa e anda até os agentes em vez de só clicar neles.
+
+- **Teclas:** setas ou `WASD` movem o boneco, `Shift` corre, `E` interage com o agente mais próximo, `1` a `6` escolhem uma ação do menu e `Esc` fecha.
+- **Menu do agente:** conversar, desafiar (os jogos chegam no projeto 4), `/btw` (pergunta avulsa de até 500 caracteres), agradecer (só vale quando há um resultado novo), puxar a orelha e baixar o modelo.
+- **Escada de modelos:** subir e descer andam um degrau por vez. No Claude: haiku, sonnet, opus, fable. No Codex: gpt-5.1-codex-mini, gpt-5.2-codex, gpt-5.3-codex. O pedido leva o modelo que a pessoa viu na tela (`de`); se o agente já mudou, o servidor responde 409 e nada é gravado.
+- **Auras:** o modelo aparece em volta do agente. Só o `fable` tem a chama dourada; o `opus` tem um brilho intermediário; `haiku` e `sonnet` têm um brilho sutil. Com `prefers-reduced-motion` ativo, a aura fica parada.
+- **Equipe:** a equipe cadastrada (veja "Painel da holding") pode as mesmas ações do dono, inclusive pelo celular. O servidor audita cada ação com o nome de quem fez; pedido sem nome ou feito por agente recebe 403.
+
 ## O que mudou em relação ao Habblaud
 
 `shared/types.ts` (RoomInfo.build e floor), `client/src/world/sim/sim.ts` e `world/layout/custom-room.ts` (salas montadas, um andar por vez), `world/api.ts` (sem tema sazonal), `ui/` (construtor, operações, conversa, pedidos aos terminais, botão de andar) e `floor.ts`. O `server/` é novo; só `server/core/vendor/` é gerado a partir de `shared/` do Habblaud.
