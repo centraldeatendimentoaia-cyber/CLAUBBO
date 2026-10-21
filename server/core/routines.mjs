@@ -9,6 +9,7 @@ import { getAgent } from './agents.mjs';
 import { createTask, listTasks } from './tasks.mjs';
 import { newId, readJson, writeJson } from './store.mjs';
 import { usageOf } from './usage.mjs';
+import { award, XP_ROTINA } from './xp.mjs';
 import { describeWhen, isDue, parseWhen } from './when.mjs';
 
 const BRAKE_PERCENT = 80;
@@ -30,13 +31,15 @@ const readHistory = () => {
 /** Grava as execuções que terminaram desde a última vez. Devolve quantas linhas entraram. */
 export function recordHistory(tasks = listTasks()) {
   const seen = new Set(readHistory().map((e) => e.task));
-  const lines = [];
+  const lines = [], premiar = [];
   for (const t of tasks) {
     if (!t.routine || t.state !== 'done' || seen.has(t.id)) continue;
     const ok = !t.error;
     lines.push(JSON.stringify({ routine: t.routine, task: t.id, startedAt: t.startedAt || t.addedAt, finishedAt: t.doneAt || Date.now(), ok, result: String(ok ? t.result ?? '' : t.error).slice(0, 300) }));
+    if (ok && t.agent) premiar.push(t);
   }
   if (lines.length) fs.appendFileSync(historyFile(), `${lines.join('\n')}\n`);
+  for (const t of premiar) award(`rotina:${t.id}`, t.agent, XP_ROTINA, t.doneAt || Date.now()); // chave única: segunda proteção contra repetir
   return lines.length;
 }
 

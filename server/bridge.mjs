@@ -52,6 +52,7 @@ import { loadTeam } from './core/equipe.mjs';
 import { buildPending, decisionOf, rememberDecision } from './core/pendencias.mjs';
 import { buildHolding, confirmarAntesDeAgir, lotesSeguros, podeDecidir } from './core/holding.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
+import * as xp from './core/xp.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -368,7 +369,6 @@ const AGENT_ROUTES = /^\/api\/(cli\/requests|cli\/open|agent-proposals|agent-cal
 /** Com `pid` (id da pendência), a janela só abre se o item pedir (needsDialog); item desconhecido sempre abre. Sem `pid`, sempre abre. */
 const human = async (res, what, pid) => { const r = (fromNetwork(res.req) && PHONE_WRITES.test(new URL(res.req.url, 'http://x').pathname)) || (pid && pendingNow().find((x) => x.id === pid)?.needsDialog === false) ? { ok: true } : await confirmHuman(what); if (!r.ok) json(res, r.status, { error: r.error }); return r.ok; };
 // XP ainda não existe (Task 4 troca isto pelo módulo real): nada a avaliar, elenco vazio.
-const xpStub = { elenco: () => [], xpHoje: () => 0, avaliada: () => true };
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
@@ -759,7 +759,15 @@ ${logs}` : ''}`;
     }
   }
   if (p === '/api/holding' && method === 'GET') {
-    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xpStub }), papel: req.pessoa.papel });
+    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp }), papel: req.pessoa.papel });
+  }
+  if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: xp.elenco(), xpHoje: xp.xpHoje() });
+  if (p === '/api/xp/ficou-bom' && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode avaliar' });
+    const body = await readBody(req);
+    // Nada assíncrono depois do corpo: a tarefa é lida do servidor e o XP é concedido na mesma passada síncrona.
+    const r = xp.ficouBom({ pessoa: req.pessoa, taskId: body?.task, tasks: listTasks(), getAgent });
+    return r.ok ? json(res, 200, { ok: true, duplicado: r.duplicado, agent: r.agent, xp: r.xp }) : json(res, r.status, { error: r.error });
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });

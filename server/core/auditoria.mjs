@@ -7,7 +7,7 @@ const MAX_BYTES = 5 * 1024 * 1024; // shortcut: um único arquivo antigo (.1) fi
 export const FILE = 'auditoria.jsonl';
 
 /** PUT e DELETE sempre; entre os POST, os que restauram, apagam por aprovação, renomeiam, gravam arquivo ou aprovam código. */
-const AUDITED = /^(DELETE|PUT) |^POST \/api\/(backups\/[^/]+\/restore|agent-proposals\/[^/]+\/approve|ops\/tasks\/[^/]+\/approve|cli\/requests\/[^/]+\/approve|agent-calls\/[^/]+\/approve|pendencias\/aprovar-seguros$|rooms\/rename|deliveries\/upload\/)/;
+const AUDITED = /^(DELETE|PUT) |^POST \/api\/(backups\/[^/]+\/restore|agent-proposals\/[^/]+\/approve|ops\/tasks\/[^/]+\/approve|cli\/requests\/[^/]+\/approve|agent-calls\/[^/]+\/approve|pendencias\/aprovar-seguros$|xp\/ficou-bom$|rooms\/rename|deliveries\/upload\/)/;
 export const shouldAudit = (method, pathname) => AUDITED.test(`${method} ${pathname}`);
 
 /** Acrescenta uma linha. Falha de gravação nunca derruba o pedido: vai para o console. */
