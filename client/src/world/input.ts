@@ -17,6 +17,8 @@ export interface InputHandlers {
   active?(): boolean;
   /** (Opcional) O teclado mexe na câmera? (Na visita, as setas e o WASD andam com o visitante.) Padrão: sim. */
   keys?(): boolean;
+  /** (Opcional) As setas e o WASD andam com o boneco do jogador em vez de mover a câmera? (+, − e 0 seguem valendo.) */
+  moveKeys?(): boolean;
 }
 
 const DRAG_THRESHOLD = 5;
@@ -214,6 +216,7 @@ export function attachInput(canvas: HTMLCanvasElement, camera: Camera, h: InputH
       default:
         return;
     }
+    if (h.moveKeys?.() && (dx || dy)) return;
     e.preventDefault();
     h.interact();
     camera.panBy(dx, dy);

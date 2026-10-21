@@ -5,6 +5,9 @@
 export type Selection = { type: 'agent'; id: string } | { type: 'room'; id: string } | null;
 
 import type { PetsConfig } from './pets/config';
+import type { AgentInfo } from '../../../shared/types';
+import type { Alvo } from './player';
+import type { VisitorIntent } from './sim/visitor';
 
 export interface WorldOptions {
   /** Mostrar etiquetas com os nomes dos personagens. */
@@ -160,3 +163,23 @@ export const DEFAULT_WORLD_OPTIONS: WorldOptions = {
   dayNight: true,
   theme: 'auto',
 };
+
+/**
+ * (Aditivo) O boneco do jogador dentro do escritório (createWorld sem `visit`; na cena Visita não existe). Cada página
+ * tem o seu: não é compartilhado, nasce no elevador do andar 1 e a posição não é guardada entre sessões. Sem `ligar`,
+ * nada muda. O teclado (setas e WASD, Shift corre) é lido pelo próprio mundo, menos com um campo, menu ou diálogo em
+ * foco e no timelapse.
+ */
+export interface PlayerWorld {
+  /** Liga o boneco (aparência do dono) no elevador do andar 1 e mostra esse andar. */
+  ligar(me: { name: string; look: 'f' | 'm'; parts?: AgentInfo['parts'] }): void;
+  desligar(): void;
+  /** Para onde andar (o teclado já faz isso; serve para controles na tela). */
+  setIntent(i: VisitorIntent): void;
+  /** O agente ou elevador mais perto, à frente do boneco; null se não há. */
+  alvo(): Alvo | null;
+  /** Onde desenhar a dica do alvo (px CSS), ou null fora da tela. */
+  alvoNaTela(): { x: number; y: number } | null;
+  /** Com o boneco perto de um elevador: ele entra, e aparece no elevador do andar de destino. false se não pode agora. */
+  irParaAndar(andar: number): boolean;
+}
