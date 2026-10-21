@@ -562,6 +562,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   };
 
   const player: PlayerWorld = {
+    // Atenção: além de pôr o boneco no elevador do andar 1, chama setFloor(1), que muda a vista e grava `ev2.floor`.
     ligar: (me) => {
       playerMe = { name: me.name, look: me.look, ...(me.parts ? { parts: me.parts } : {}) };
       playerKeys.clear();
@@ -608,7 +609,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       // só do elevador: perto de um e livre (o passo do boneco até a porta e a porta fechando são da simulação)
       if (!s.visitorElevator()) return false;
       if (!s.visitorExit(() => (pendingPlayerFloor = andar))) return false;
-      playerKeys.clear();
+      clearPlayerKeys();
       return true;
     },
   };

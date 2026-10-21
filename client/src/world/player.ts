@@ -24,8 +24,8 @@ const COLADO = 0.6;
 const FRENTE: Record<Dir, readonly [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 /**
- * O candidato mais perto dentro do raio. Só conta quem está na frente do boneco (do lado para onde `dir` aponta) ou
- * quase colado nele; empate de distância vai para o menor id, para o resultado não depender da ordem da lista.
+ * O candidato mais perto dentro do raio. Agente só conta se está na frente do boneco (do lado para onde `dir` aponta) ou
+ * quase colado nele; o elevador conta só pelo raio (o boneco nasce de costas para a porta e a dica precisa aparecer); empate de distância vai para o menor id, para o resultado não depender da ordem da lista.
  */
 export function alvoMaisPerto(pos: { x: number; y: number }, dir: Dir, candidatos: readonly Candidato[], raioTiles = 1.5): Alvo | null {
   const [fx, fy] = FRENTE[dir];
@@ -34,7 +34,7 @@ export function alvoMaisPerto(pos: { x: number; y: number }, dir: Dir, candidato
     const dx = c.x - pos.x;
     const dy = c.y - pos.y;
     const d = Math.hypot(dx, dy);
-    if (d > raioTiles || (d >= COLADO && dx * fx + dy * fy <= 0)) continue;
+    if (d > raioTiles || (c.tipo === 'agente' && d >= COLADO && dx * fx + dy * fy <= 0)) continue;
     if (!melhor || d < melhor.distancia || (d === melhor.distancia && c.id < melhor.id)) melhor = { tipo: c.tipo, id: c.id, distancia: d };
   }
   return melhor;

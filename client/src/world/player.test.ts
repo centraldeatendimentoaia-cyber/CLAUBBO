@@ -41,6 +41,10 @@ describe('alvoMaisPerto', () => {
     expect(alvoMaisPerto(ORIGEM, 'right', [agente('ana', 9.5, 10)])?.id).toBe('ana');
   });
 
+  it('elevador atrás do boneco, dentro do raio: é alvo (só agente exige a frente)', () => {
+    expect(alvoMaisPerto(ORIGEM, 'right', [elevador('e0', 8.8, 10)])?.id).toBe('e0');
+  });
+
   it('respeita o raio dado', () => {
     expect(alvoMaisPerto(ORIGEM, 'down', [agente('ana', 10, 11.4)], 1)).toBeNull();
     expect(alvoMaisPerto(ORIGEM, 'down', [agente('ana', 10, 11.4)])?.id).toBe('ana');
@@ -129,9 +133,8 @@ describe('o jogador dentro do escritório (Sim fora do modo visita)', () => {
     run(sim, clock, 10, () => !sim.visitorBusy);
     expect(sim.visitorBusy).toBe(false);
     expect(sim.chars.has(VISITOR_ID)).toBe(false);
-    // recém-saído do elevador ele olha para baixo, de costas para a porta: o alvo só aparece quando vira para ela
-    expect(alvoDoJogador(sim)).toBeNull();
-    v.dir = 'up';
+    // recém-saído do elevador ele olha para baixo, de costas para a porta: o elevador vale só pelo raio
+    expect(v.dir).toBe('down');
     const a = alvoDoJogador(sim);
     expect(a?.tipo).toBe('elevador');
     expect(posicaoDoAlvo(sim, a!)).not.toBeNull();
