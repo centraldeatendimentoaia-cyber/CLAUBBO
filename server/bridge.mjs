@@ -377,6 +377,8 @@ const human = async (res, what, pid, { sempre = false } = {}) => {
 };
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
+// Cada agente do elenco ganha `obrigadoPossivel`: há resultado verificado ainda sem reconhecimento (a página só habilita o botão; quem decide é a rota).
+const comObrigado = (elenco) => { const tasks = listTasks(); return elenco.map((e) => ({ ...e, obrigadoPossivel: !!xp.resultadoPendente(e.agent, { tasks }) })); };
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
 /** Quem pode decidir o item `pid`: só dono e equipe (qualquer outro papel é negado); equipe não decide o que é só do dono; item já decidido por outra pessoa dá 409. Devolve `{ stage }` (o estágio classificado, para `recheck`) ou false (já respondeu). */
 const gatePending = (req, res, pid) => {
@@ -766,9 +768,9 @@ ${logs}` : ''}`;
     }
   }
   if (p === '/api/holding' && method === 'GET') {
-    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xp.lerXp() }), papel: req.pessoa.papel });
+    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xp.lerXp() }), elenco: comObrigado(xp.elenco()), papel: req.pessoa.papel });
   }
-  if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: xp.elenco(), xpHoje: xp.xpHoje() });
+  if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: comObrigado(xp.elenco()), xpHoje: xp.xpHoje() });
   if (p === '/api/xp/ficou-bom' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode avaliar' });
     const body = await readBody(req);
@@ -785,6 +787,15 @@ ${logs}` : ''}`;
     auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/modelo#${r.de}->${r.para}`, status: 200 });
     pollSoon();
     return json(res, 200, { ok: true, de: r.de, para: r.para, agent: r.agent });
+  }
+  if ((m = /^\/api\/agentes\/([^/]+)\/obrigado$/.exec(p)) && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode agradecer' });
+    // Sem corpo útil: o resultado é escolhido no servidor, na mesma passada síncrona que concede o XP.
+    const r = xp.agradecer({ pessoa: req.pessoa, agentId: m[1], tasks: listTasks(), getAgent });
+    if (!r.ok) return json(res, r.status, { error: r.error });
+    auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/obrigado#${r.id}`, status: 200 });
+    pollSoon();
+    return json(res, 200, { ok: true, agent: r.agent, xp: r.xp, id: r.id });
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });

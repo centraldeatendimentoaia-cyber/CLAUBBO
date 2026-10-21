@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { config } from './config.mjs';
 // @ts-expect-error módulo .mjs sem tipos
-import { avaliada, award, elenco, ficouBom, lerXp, levelOf, xpHoje, xpOf } from './xp.mjs';
+import { XP_OBRIGADO, agradecer, avaliada, award, elenco, ficouBom, lerXp, levelOf, resultadoPendente, xpHoje, xpOf } from './xp.mjs';
 // @ts-expect-error módulo .mjs sem tipos
 import { recordHistory } from './routines.mjs';
 
@@ -141,5 +141,47 @@ describe('lerXp e poda (M3)', () => {
     expect(lerXp().xpHoje(agora)).toBe(5);
     const eventos = JSON.parse(fs.readFileSync(path.join(dir, 'xp.json'), 'utf8')).eventos;
     expect(Object.keys(eventos).sort()).toEqual(['bom:velha', 'rotina:nova']);
+  });
+});
+
+describe('agradecer', () => {
+  const equipe = { papel: 'equipe', nome: 'Bia' };
+  const dono = { papel: 'dono', nome: 'João' };
+  const args = (over: Record<string, unknown> = {}) => ({ pessoa: equipe, agentId: 'ana', tasks: [tarefa()], rotinas: [], getAgent: agentes, ...over });
+
+  it('sem tarefa concluída: 409', () => {
+    expect(agradecer(args({ tasks: [] }))).toMatchObject({ ok: false, status: 409, error: 'sem resultado novo para agradecer' });
+  });
+  it('tarefa done sem erro: 200 e XP sobe XP_OBRIGADO; segunda chamada dá 409', () => {
+    expect(agradecer(args())).toMatchObject({ ok: true, status: 200, id: 't1', xp: XP_OBRIGADO });
+    expect(xpOf('ana')).toBe(XP_OBRIGADO);
+    expect(agradecer(args())).toMatchObject({ ok: false, status: 409, error: 'sem resultado novo para agradecer' });
+    expect(xpOf('ana')).toBe(XP_OBRIGADO);
+  });
+  it('tarefa com bom: ou com erro não conta e o XP não muda', () => {
+    award('bom:t1', 'ana', 30);
+    expect(agradecer(args())).toMatchObject({ ok: false, status: 409 });
+    expect(agradecer(args({ tasks: [tarefa({ id: 't2', error: 'x' })] }))).toMatchObject({ ok: false, status: 409 });
+    expect(xpOf('ana')).toBe(30);
+  });
+  it('outra pessoa depois da primeira: 409 citando o nome', () => {
+    agradecer(args());
+    expect(agradecer(args({ pessoa: dono }))).toMatchObject({ ok: false, status: 409, error: 'já agradecido por Bia' });
+    expect(xpOf('ana')).toBe(XP_OBRIGADO);
+  });
+  it('execução de rotina concluída conta', () => {
+    expect(agradecer(args({ tasks: [], rotinas: [tarefa({ id: 'r1', routine: 'rot' })] }))).toMatchObject({ ok: true, id: 'r1' });
+    expect(resultadoPendente('ana', { tasks: [], rotinas: [tarefa({ id: 'r1' })] })).toBeNull();
+  });
+  it('escolhe o resultado mais recente ainda sem reconhecimento', () => {
+    const tasks = [tarefa({ id: 'velha', doneAt: 1 }), tarefa({ id: 'nova', doneAt: 9 })];
+    expect(resultadoPendente('ana', { tasks, rotinas: [] })).toEqual({ id: 'nova', tipo: 'tarefa' });
+  });
+  it('403 sem nome ou sem papel; 404 agente inexistente', () => {
+    for (const pessoa of [{ papel: 'equipe' }, { papel: 'agente', nome: 'x' }, undefined]) {
+      expect(agradecer(args({ pessoa }))).toMatchObject({ ok: false, status: 403 });
+    }
+    expect(agradecer(args({ agentId: 'zz' }))).toMatchObject({ ok: false, status: 404 });
+    expect(xpOf('ana')).toBe(0);
   });
 });
