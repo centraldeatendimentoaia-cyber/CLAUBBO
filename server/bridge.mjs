@@ -10,7 +10,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { config } from './core/config.mjs';
-import { createAccount, dirOf, listAccounts, openClaudeTerminal, removeAccount, startLogin } from './core/accounts.mjs';
+import { createAccount, dirOf, getAccount, listAccounts, openClaudeTerminal, removeAccount, startLogin } from './core/accounts.mjs';
 import { recentActivity } from './core/activity.mjs';
 import { normalize as normalizeAgent, createAgent, deleteAgent, getAgent, loadAgents, updateAgent } from './core/agents.mjs';
 import { listSkills, systemFor } from './core/brain.mjs';
@@ -53,6 +53,8 @@ import { buildPending, decisionOf, rememberDecision } from './core/pendencias.mj
 import { buildHolding, confirmarAntesDeAgir, dispensaJanela, lotesSeguros, podeDecidir, reservarEntrega } from './core/holding.mjs';
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import * as xp from './core/xp.mjs';
+import { trocarModelo } from './core/modelos.mjs';
+import { criarBtw } from './core/btw.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -337,6 +339,7 @@ const saveProps = () => writeJson(PROP_FILE, agentProposals.slice(-50));
 // Uma por vez; quem responde roda sem cli-agents, então não encadeia chamadas.
 const CALL_FILE = path.join(config.data, 'agent-calls.json');
 const callStore = readJson(CALL_FILE, { grants: [], calls: [] });
+const btw = criarBtw({ runTurn, getAgent, systemFor, providerReal: (a) => getAccount(a.account)?.provider });
 const saveCalls = () => writeJson(CALL_FILE, { grants: callStore.grants, calls: callStore.calls.slice(-50) });
 const granted = (from, to) => callStore.grants.some((g) => g.from === from && g.to === to);
 const callBusy = () => callStore.calls.some((c) => c.state === 'running');
@@ -376,6 +379,8 @@ const human = async (res, what, pid, { sempre = false } = {}) => {
 };
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
+// Cada agente do elenco ganha `obrigadoPossivel`: há resultado verificado ainda sem reconhecimento (a página só habilita o botão; quem decide é a rota).
+const comObrigado = (elenco) => { const tasks = listTasks(); return elenco.map((e) => ({ ...e, obrigadoPossivel: !!xp.resultadoPendente(e.agent, { tasks }) })); };
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
 /** Quem pode decidir o item `pid`: só dono e equipe (qualquer outro papel é negado); equipe não decide o que é só do dono; item já decidido por outra pessoa dá 409. Devolve `{ stage }` (o estágio classificado, para `recheck`) ou false (já respondeu). */
 const gatePending = (req, res, pid) => {
@@ -765,15 +770,43 @@ ${logs}` : ''}`;
     }
   }
   if (p === '/api/holding' && method === 'GET') {
-    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xp.lerXp() }), papel: req.pessoa.papel });
+    return json(res, 200, { ...buildHolding({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls, routines: listRoutines(), activity: recentActivity(TICKER_LIDO), xp: xp.lerXp() }), elenco: comObrigado(xp.elenco()), papel: req.pessoa.papel });
   }
-  if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: xp.elenco(), xpHoje: xp.xpHoje() });
+  if (p === '/api/xp' && method === 'GET') return json(res, 200, { elenco: comObrigado(xp.elenco()), xpHoje: xp.xpHoje() });
   if (p === '/api/xp/ficou-bom' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode avaliar' });
     const body = await readBody(req);
     // Nada assíncrono depois do corpo: a tarefa é lida do servidor e o XP é concedido na mesma passada síncrona.
     const r = xp.ficouBom({ pessoa: req.pessoa, taskId: body?.task, tasks: listTasks(), getAgent });
     return r.ok ? json(res, 200, { ok: true, duplicado: r.duplicado, agent: r.agent, xp: r.xp }) : json(res, r.status, { error: r.error });
+  }
+  if ((m = /^\/api\/agentes\/([^/]+)\/modelo$/.exec(p)) && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode trocar o modelo' });
+    const body = await readBody(req);
+    // Nada assíncrono depois do corpo: conferir `de` e gravar acontecem na mesma passada síncrona.
+    const r = trocarModelo({ pessoa: req.pessoa, id: m[1], direcao: body?.direcao, de: body?.de, getAgent, updateAgent, providerReal: (a) => getAccount(a.account)?.provider });
+    if (!r.ok) return json(res, r.status, { error: r.error });
+    auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/modelo#${r.de}->${r.para}`, status: 200 });
+    pollSoon();
+    return json(res, 200, { ok: true, de: r.de, para: r.para, agent: r.agent });
+  }
+  if ((m = /^\/api\/agentes\/([^/]+)\/btw$/.exec(p)) && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode fazer perguntas avulsas' });
+    const body = await readBody(req);
+    const r = await btw({ pessoa: req.pessoa, agentId: m[1], pergunta: body?.pergunta });
+    if (!r.ok) return json(res, r.status, { error: r.error });
+    // a auditoria registra só o caminho: o texto da pergunta não é gravado
+    auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/btw`, status: 200 });
+    return json(res, 200, { ok: true, resposta: r.resposta });
+  }
+  if ((m = /^\/api\/agentes\/([^/]+)\/obrigado$/.exec(p)) && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode agradecer' });
+    // Sem corpo útil: o resultado é escolhido no servidor, na mesma passada síncrona que concede o XP.
+    const r = xp.agradecer({ pessoa: req.pessoa, agentId: m[1], tasks: listTasks(), getAgent });
+    if (!r.ok) return json(res, r.status, { error: r.error });
+    auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/obrigado#${r.id}`, status: 200 });
+    pollSoon();
+    return json(res, 200, { ok: true, agent: r.agent, xp: r.xp, id: r.id });
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });

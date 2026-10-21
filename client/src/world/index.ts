@@ -4,7 +4,7 @@ import * as artModule from '../art';
 import { TILE, type ArtModule } from '../art/api';
 import type { OfficeStore } from '../net/store';
 import { getFloor, onFloor, setFloor } from '../floor';
-import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type Selection, type SocialEvent, type SoundCue, type WorldApi, type WorldOptions, type WorldPlayback } from './api';
+import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type PlayerWorld, type Selection, type SocialEvent, type SoundCue, type WorldApi, type WorldOptions, type WorldPlayback } from './api';
 import { loadWorldAssets, type WorldAssets } from './assets';
 import { createBuildingView, onToggleBuilding } from './building-view';
 import { Camera, overviewFrame } from './camera';
@@ -12,7 +12,9 @@ import { createDebug, type WorldDebug } from './debug';
 import { BUILDING_H, COL_W } from './constants';
 import { RECEPTION_ID } from './layout/core';
 import { inRect } from './layout/geometry';
-import { attachInput, type Hit } from './input';
+import { attachInput, modalOpen, type Hit } from './input';
+import { intentFrom, moveKeyOf } from './city/input';
+import { alvoDoJogador, posicaoDoAlvo, type Alvo } from './player';
 import type { AgentInfo } from '../../../shared/types';
 import { rebaseSnapshot } from './playback';
 import { Overlay } from './render/overlay';
@@ -22,6 +24,7 @@ import { NO_INTENT, VISITOR_ID, visitorInfo, type VisitorIntent } from './sim/vi
 import { SoundCues } from './sound-cues';
 
 export * from './api';
+export type { Alvo } from './player';
 export type { WorldDebug } from './debug';
 
 const art: ArtModule = artModule;
@@ -52,7 +55,7 @@ export interface CreateWorldOptions {
   visit?: boolean;
 }
 
-export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: CreateWorldOptions = {}): WorldApi & { debug: WorldDebug; visit: VisitWorld } {
+export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: CreateWorldOptions = {}): WorldApi & { debug: WorldDebug; visit: VisitWorld; player?: PlayerWorld } {
   let options: WorldOptions = { ...DEFAULT_WORLD_OPTIONS };
   const visitMode = !!o.visit;
   const camera = new Camera();
@@ -91,6 +94,27 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     return { floor, sim: s, renderer: r, overlay: new Overlay(r.ctx, s, r, camera), cues: new SoundCues(s, camera) };
   };
   const layers = new Map<number, Layer>();
+
+  // ---------------------------------------------------------------- boneco do jogador (fora da visita)
+  // O meu boneco é o visitante da cena Visita (Sim.setVisitor) vivendo na simulação de UM andar. Cada página tem o seu
+  // (não é compartilhado), ele nasce no elevador do andar 1 e a posição não é guardada entre sessões.
+  let playerMe: { name: string; look: 'f' | 'm'; parts?: AgentInfo['parts'] } | null = null;
+  let playerFloor = 1;
+  let playerIntent: VisitorIntent = { ...NO_INTENT };
+  /** Andar de destino pedido pelo elevador; a troca roda no início do próximo quadro, fora do passo da simulação. */
+  let pendingPlayerFloor: number | null = null;
+  const playerSim = (): Sim | undefined => layers.get(playerFloor)?.sim;
+  /** Põe o boneco no elevador do andar (null = tira de todos os andares). */
+  const placePlayer = (floor: number | null) => {
+    const now = Date.now();
+    for (const l of layers.values()) if (l.sim.visitor) l.sim.setVisitor(null, now);
+    if (floor === null || !playerMe) return;
+    playerFloor = layers.has(floor) ? floor : 1;
+    const s = playerSim();
+    if (!s) return;
+    s.setVisitor(visitorInfo(playerMe, now), now);
+    s.visitorIntent = { ...playerIntent };
+  };
   let activeFloor = visitMode ? 1 : getFloor();
   /** Andares que o snapshot pede: um por sala do Escritório, mais sempre o 1 e o 2 (terminais). Visita: só o 1. */
   const wantedFloors = (): Set<number> => {
@@ -108,6 +132,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     for (const f of want) if (!layers.has(f)) layers.set(f, makeLayer(f));
     for (const f of [...layers.keys()]) if (!want.has(f)) layers.delete(f);
     if (!layers.has(activeFloor)) setFloor(1);
+    // o andar do boneco sumiu: ele volta ao elevador do andar 1
+    if (playerMe && !playback && !playerSim()?.visitor && pendingPlayerFloor === null) placePlayer(1);
   };
   const useLayer = (floor: number) => {
     const l = layers.get(floor) ?? layers.get(1)!;
@@ -316,6 +342,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     zoomStep,
     active: () => !suspended,
     keys: () => !visitMode,
+    moveKeys: () => !!playerMe,
   });
 
   // ------------------------------------------------------------------ dados
@@ -371,6 +398,15 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     try {
       const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
       if (canvas.clientWidth !== camera.viewW || canvas.clientHeight !== camera.viewH || dpr !== camera.dpr) resize();
+      if (pendingPlayerFloor !== null) {
+        const f = pendingPlayerFloor;
+        pendingPlayerFloor = null;
+        if (playerMe && !playback && layers.has(f)) {
+          placePlayer(f);
+          setFloor(f);
+          followVisitor();
+        }
+      }
       sim.update(dt, now);
       for (const l of layers.values()) {
         if (l.sim === sim) continue;
@@ -399,8 +435,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
           framed = true;
         } else if (!userMoved) overview(true);
       }
-      // visita: andando pelo teclado, a câmera vai junto
-      if (visitMode && sim.visitor && (sim.visitorIntent.dx || sim.visitorIntent.dy) && camera.follow !== VISITOR_ID) followVisitor();
+      // visita (e jogador): andando pelo teclado, a câmera vai junto
+      if ((visitMode || playerMe) && sim.visitor && (sim.visitorIntent.dx || sim.visitorIntent.dy) && camera.follow !== VISITOR_ID) followVisitor();
       const followCh = camera.follow ? sim.person(camera.follow) : undefined;
       if (camera.follow && !followCh) camera.follow = null;
       camera.update(real, followCh ? camera.centerFor(followCh.x, followCh.y - 12, camera.zoom) : null, realDt);
@@ -472,12 +508,113 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     sim.social.wallets.save(Date.now());
     buildLayers();
     useLayer(activeFloor);
+    // o timelapse é replay do passado: sem o meu boneco; ao voltar ao vivo ele nasce de novo no elevador do andar mostrado
+    pendingPlayerFloor = null;
+    if (playerMe) placePlayer(playback ? null : activeFloor);
     debug = createDebug(sim, renderer, camera, markMoved);
     lastCols = -1;
     setHover(null);
   };
 
+  // ------------------------------------------------------------------ teclado do jogador
+
+  const playerKeys = new Set<string>();
+  let playerShift = false;
+  const pushPlayerIntent = () => {
+    // Só anda com o andar do boneco na tela (o seletor de andar da UI pode mostrar outro: o boneco invisível não se move).
+    playerIntent = playerMe && !playback && !suspended && playerFloor === activeFloor ? intentFrom(playerKeys, playerShift) : { ...NO_INTENT };
+    const s = playerSim();
+    if (s) s.visitorIntent = { ...playerIntent };
+  };
+  const clearPlayerKeys = () => {
+    playerKeys.clear();
+    playerShift = false;
+    pushPlayerIntent();
+  };
+  /** O foco está num campo de texto, rádio ou menu: as setas e o WASD são dele, não do boneco. */
+  const focusTakesKeys = (t: HTMLElement | null) =>
+    !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName ?? '') || !!t.closest?.('[role="radio"], [role="menu"], [role="menuitem"], [role="listbox"], [role="option"]'));
+  const onPlayerKey = (e: KeyboardEvent, down: boolean) => {
+    if (!playerMe) return;
+    if (e.key === 'Shift') playerShift = down;
+    else if (typeof e.getModifierState === 'function') playerShift = e.getModifierState('Shift');
+    const k = moveKeyOf(e);
+    // Shift apertado com a seta já segurada também muda a intenção: a seta presa não repete o keydown.
+    if (e.key === 'Shift' && down) pushPlayerIntent();
+    if (!down) {
+      if (k) playerKeys.delete(k);
+      pushPlayerIntent();
+      return;
+    }
+    const t = e.target as HTMLElement | null;
+    if (!k || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || suspended || playback || focusTakesKeys(t) || modalOpen(t)) return;
+    e.preventDefault();
+    playerKeys.add(k);
+    pushPlayerIntent();
+  };
+  if (!visitMode) {
+    window.addEventListener('keydown', (e) => onPlayerKey(e, true), { signal: abort.signal });
+    window.addEventListener('keyup', (e) => onPlayerKey(e, false), { signal: abort.signal });
+    window.addEventListener('blur', clearPlayerKeys, { signal: abort.signal });
+  }
+
+  /** Posição na tela (CSS px) de um ponto do mundo, ou null fora da tela. */
+  const onScreen = (x: number, y: number) => {
+    const p = camera.worldToScreen(x, y);
+    return p.x < 0 || p.y < 0 || p.x > camera.viewW || p.y > camera.viewH ? null : p;
+  };
+
+  const player: PlayerWorld = {
+    // O boneco nasce no elevador do andar que está na tela; não troca de andar nem sobrescreve `ev2.floor`.
+    ligar: (me) => {
+      playerMe = { name: me.name, look: me.look, ...(me.parts ? { parts: me.parts } : {}) };
+      playerKeys.clear();
+      playerShift = false;
+      pendingPlayerFloor = null;
+      playerIntent = { ...NO_INTENT };
+      placePlayer(playback ? null : activeFloor);
+      if (!playback && !suspended && !userMoved) followVisitor();
+    },
+    desligar: () => {
+      playerMe = null;
+      pendingPlayerFloor = null;
+      playerKeys.clear();
+      playerShift = false;
+      playerIntent = { ...NO_INTENT };
+      placePlayer(null);
+      if (camera.follow === VISITOR_ID) camera.follow = null;
+    },
+    setIntent: (i) => {
+      playerIntent = playerMe && !playback ? { ...i } : { ...NO_INTENT };
+      const s = playerSim();
+      if (s) s.visitorIntent = { ...playerIntent };
+    },
+    alvo: () => {
+      const s = playerSim();
+      return s && !playback ? alvoDoJogador(s) : null;
+    },
+    alvoNaTela: () => {
+      const s = playerSim();
+      if (!s || s !== sim || playback) return null;
+      const a = alvoDoJogador(s);
+      const pos = a && posicaoDoAlvo(s, a);
+      if (!a || !pos) return null;
+      // agente: logo acima da cabeça; elevador: acima da porta
+      return a.tipo === 'agente' ? onScreen(pos.x, pos.y - 2) : onScreen(pos.x, pos.y - TILE * 1.6);
+    },
+    irParaAndar: (andar) => {
+      const s = playerSim();
+      if (!playerMe || playback || !s || !Number.isInteger(andar) || andar === playerFloor || !layers.has(andar)) return false;
+      // só do elevador: perto de um e livre (o passo do boneco até a porta e a porta fechando são da simulação)
+      if (!s.visitorElevator()) return false;
+      if (!s.visitorExit(() => (pendingPlayerFloor = andar))) return false;
+      clearPlayerKeys();
+      return true;
+    },
+  };
+
   return {
+    ...(visitMode ? {} : { player }),
     select: (sel, opts) => setSelection(sel, !!opts?.focus),
     getSelection: () => selection,
     onSelect: (cb) => {
@@ -535,6 +672,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       playback = p;
       worldNow = p ? p.clock() : 0;
       rebuild();
+      clearPlayerKeys();
     },
     onSound: (cb) => {
       soundCbs.add(cb);
@@ -543,6 +681,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     setSuspended: (on) => {
       if (on === suspended) return;
       suspended = on;
+      clearPlayerKeys();
       if (on) {
         cancelAnimationFrame(raf);
         suspendedAt = Date.now();

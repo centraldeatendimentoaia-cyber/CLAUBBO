@@ -53,9 +53,20 @@ Uma página só com o que espera decisão e o que merece avaliação. Abre pelo 
 - **Atalhos:** `1`, `2` e `3` agem no cartão da mesma posição e `A` aprova todos os itens seguros de uma vez. Só item seguro (reversível, sem custo, sem envio de mensagem e sem confirmação no computador) aprova por tecla; nos demais a tecla apenas abre a revisão, e aprovar ou recusar exige clicar no botão.
 - **Papéis:** o dono (quem usa o computador do servidor) decide tudo e dá o "ficou bom". A equipe vê o painel e decide só o que não é exclusivo do dono; o resto aparece como "aguarda o dono" e uma tentativa direta pela API recebe 403. Se duas pessoas decidem o mesmo item, a segunda recebe 409 com o nome de quem decidiu primeiro, e a auditoria registra o nome de cada pessoa.
 - **Cadastrar pessoas:** `node scripts/equipe.mjs add <nome> [equipe|dono]` (o papel padrão é `equipe`; `list` mostra quem existe, sem tokens). O endereço com o token aparece uma única vez e `data/equipe.json` guarda só o hash. A pessoa abre o endereço no aparelho dela, na mesma rede, e o token vira cookie. Isso usa o modo celular: suba o servidor com `V2_LAN_HOST=<IP do computador no Wi-Fi>` (veja [`CELULAR.md`](CELULAR.md)) e rode o `add` com a mesma variável para o endereço sair com o IP certo. Pelo celular só se aprova e recusa; o resto é somente leitura (mesmo com `V2_CELULAR_ESCRITA=1`, só o token do QR code, que é do dono, escreve além disso).
+- **Trocar o modelo:** a equipe cadastrada (e o dono) pode subir ou descer o modelo de um agente, um degrau por vez, inclusive pelo celular; cada troca fica na auditoria com o nome de quem fez.
 - **Cuidado com o token da equipe:** quem tem o endereço lê pela rede tudo o que o dono lê (conversas, entregas, painel), o token não expira e vale em qualquer aparelho da rede. Para revogar: `node scripts/equipe.mjs remove <nome>` (tira só essa pessoa de `data/equipe.json`; o token dela para de valer no próximo pedido, sem reiniciar). Cadastre só quem você confia e retire quem saiu.
 - **Janela do Windows:** aprovar item perigoso (implementação e testes de agente de código, pedidos a terminais, propostas de agentes) continua abrindo a janela de confirmação no computador do servidor, como em "Token de acesso e confirmação". Item seguro não abre janela. Pelo celular, só o dono (token do QR code) dispensa a janela nas rotas de aprovar e recusar; a equipe não libera permissões de terminal, não libera chamada "para sempre" e não repete tarefa com ferramentas liberadas.
 - **XP:** só por resultado verificado: o dono clica em "Ficou bom" numa tarefa concluída sem erro, ou uma rotina termina sem erro. Cada evento conta uma única vez (repetir o clique não soma) e volume de mensagens ou tokens nunca dá XP. O celular e a equipe não conseguem avaliar.
+
+## Boneco e auras
+
+Você tem um boneco no mapa e anda até os agentes em vez de só clicar neles.
+
+- **Teclas:** setas ou `WASD` movem o boneco, `Shift` corre, `E` interage com o agente mais próximo, `1` a `6` escolhem uma ação do menu e `Esc` fecha.
+- **Menu do agente:** conversar, desafiar (os jogos chegam no projeto 4), `/btw` (pergunta avulsa de até 500 caracteres), agradecer (só vale quando há um resultado novo), puxar a orelha e baixar o modelo.
+- **Escada de modelos:** subir e descer andam um degrau por vez. No Claude: haiku, sonnet, opus, fable. No Codex: gpt-5.1-codex-mini, gpt-5.2-codex, gpt-5.3-codex. O pedido leva o modelo que a pessoa viu na tela (`de`); se o agente já mudou, o servidor responde 409 e nada é gravado.
+- **Auras:** o modelo aparece em volta do agente. Só o `fable` tem a chama dourada; o `opus` tem um brilho intermediário; `haiku` e `sonnet` têm um brilho sutil. Com `prefers-reduced-motion` ativo, a aura fica parada.
+- **Equipe:** a equipe cadastrada (veja "Painel da holding") pode as mesmas ações do dono, inclusive pelo celular. O servidor audita cada ação com o nome de quem fez; pedido sem nome ou feito por agente recebe 403.
 
 ## O que mudou em relação ao Habblaud
 
