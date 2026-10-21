@@ -54,6 +54,7 @@ import { buildHolding, confirmarAntesDeAgir, dispensaJanela, lotesSeguros, podeD
 import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import * as xp from './core/xp.mjs';
 import { trocarModelo } from './core/modelos.mjs';
+import { criarBtw } from './core/btw.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -338,6 +339,7 @@ const saveProps = () => writeJson(PROP_FILE, agentProposals.slice(-50));
 // Uma por vez; quem responde roda sem cli-agents, então não encadeia chamadas.
 const CALL_FILE = path.join(config.data, 'agent-calls.json');
 const callStore = readJson(CALL_FILE, { grants: [], calls: [] });
+const btw = criarBtw({ runTurn, getAgent, systemFor });
 const saveCalls = () => writeJson(CALL_FILE, { grants: callStore.grants, calls: callStore.calls.slice(-50) });
 const granted = (from, to) => callStore.grants.some((g) => g.from === from && g.to === to);
 const callBusy = () => callStore.calls.some((c) => c.state === 'running');
@@ -787,6 +789,15 @@ ${logs}` : ''}`;
     auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/modelo#${r.de}->${r.para}`, status: 200 });
     pollSoon();
     return json(res, 200, { ok: true, de: r.de, para: r.para, agent: r.agent });
+  }
+  if ((m = /^\/api\/agentes\/([^/]+)\/btw$/.exec(p)) && method === 'POST') {
+    if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode fazer perguntas avulsas' });
+    const body = await readBody(req);
+    const r = await btw({ pessoa: req.pessoa, agentId: m[1], pergunta: body?.pergunta });
+    if (!r.ok) return json(res, r.status, { error: r.error });
+    // a auditoria registra só o caminho: o texto da pergunta não é gravado
+    auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/btw`, status: 200 });
+    return json(res, 200, { ok: true, resposta: r.resposta });
   }
   if ((m = /^\/api\/agentes\/([^/]+)\/obrigado$/.exec(p)) && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode agradecer' });
