@@ -55,6 +55,9 @@ import { record as auditRecord, shouldAudit } from './core/auditoria.mjs';
 import * as xp from './core/xp.mjs';
 import { trocarModelo } from './core/modelos.mjs';
 import { criarBtw } from './core/btw.mjs';
+import { chavePessoa, extratoDe, saldoDe } from './core/carteiras.mjs';
+import { humorDe } from './core/humor.mjs';
+import { criarJogos } from './core/jogos.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -224,7 +227,7 @@ function buildOffice(now) {
       id: `escritorio:${a.id}`, kind: 'main', ...(acc?.provider === 'codex' ? { provider: 'codex' } : {}), roomId, name: a.name, look: seed % 2 ? 'f' : 'm', role: a.role || 'Agente', title: a.does || undefined,
       ...(a.costume === 'reaper' || a.costume === 'jmal' ? { costume: a.costume } : {}),
       ...(a.parts || a.costume === 'reaper' ? { parts: a.parts || REAPER_PARTS } : {}), ...(a.parts ? { custom: true } : {}),
-      ...(offDuty ? { offDuty: true } : {}), ...(systemOut(a) ? { system: systemOut(a) } : {}), sessionId: a.id, account: a.account || 'principal', status, ...(status === 'waiting' ? { waitingFor: 'sua aprovação em Operações > Tarefas' } : {}), activity: act, recent: act ? [act] : [], tasks: [], model: a.model || undefined, startedAt: STARTED, lastEventAt: now, statusSince: now,
+      ...(offDuty ? { offDuty: true } : {}), ...(systemOut(a) ? { system: systemOut(a) } : {}), sessionId: a.id, account: a.account || 'principal', humor: humorDe(a.id, now), status, ...(status === 'waiting' ? { waitingFor: 'sua aprovação em Operações > Tarefas' } : {}), activity: act, recent: act ? [act] : [], tasks: [], model: a.model || undefined, startedAt: STARTED, lastEventAt: now, statusSince: now,
       stats: { toolCalls: 0, tokensIn: 0, tokensOut: 0, subagents: 0 }, seed, canMessage: true,
     };
   });
@@ -340,6 +343,9 @@ const saveProps = () => writeJson(PROP_FILE, agentProposals.slice(-50));
 const CALL_FILE = path.join(config.data, 'agent-calls.json');
 const callStore = readJson(CALL_FILE, { grants: [], calls: [] });
 const btw = criarBtw({ runTurn, getAgent, systemFor, providerReal: (a) => getAccount(a.account)?.provider });
+// Ocioso = o mesmo critério do snapshot (sem turno ao vivo nem reunião) mais nenhuma tarefa na fila, rodando ou esperando OK. Síncrono: criarJogos recusa promessas.
+const agenteOcioso = (id) => !live.current(id) && !inMeeting().has(id) && !listTasks().some((t) => t.agent === id && (t.state === 'next' || t.state === 'doing' || t.state === 'waiting'));
+const jogos = criarJogos({ getAgent, agenteOcioso });
 const saveCalls = () => writeJson(CALL_FILE, { grants: callStore.grants, calls: callStore.calls.slice(-50) });
 const granted = (from, to) => callStore.grants.some((g) => g.from === from && g.to === to);
 const callBusy = () => callStore.calls.some((c) => c.state === 'running');
@@ -380,7 +386,7 @@ const human = async (res, what, pid, { sempre = false } = {}) => {
 const TICKER_LIDO = 12;
 /** Tudo que espera decisão agora, com o risco de cada item. */
 // Cada agente do elenco ganha `obrigadoPossivel`: há resultado verificado ainda sem reconhecimento (a página só habilita o botão; quem decide é a rota).
-const comObrigado = (elenco) => { const tasks = listTasks(); return elenco.map((e) => ({ ...e, obrigadoPossivel: !!xp.resultadoPendente(e.agent, { tasks }) })); };
+const comObrigado = (elenco) => { const tasks = listTasks(); return elenco.map((e) => ({ ...e, humor: humorDe(e.agent), obrigadoPossivel: !!xp.resultadoPendente(e.agent, { tasks }) })); };
 const pendingNow = () => buildPending({ tasks: listTasks(), cliRequests, proposals: agentProposals, calls: callStore.calls });
 /** Quem pode decidir o item `pid`: só dono e equipe (qualquer outro papel é negado); equipe não decide o que é só do dono; item já decidido por outra pessoa dá 409. Devolve `{ stage }` (o estágio classificado, para `recheck`) ou false (já respondeu). */
 const gatePending = (req, res, pid) => {
@@ -807,6 +813,43 @@ ${logs}` : ''}`;
     auditRecord(config.data, { who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', path: `/api/agentes/${m[1]}/obrigado#${r.id}`, status: 200 });
     pollSoon();
     return json(res, 200, { ok: true, agent: r.agent, xp: r.xp, id: r.id });
+  }
+  // ---- jogos: pedra, papel e tesoura com moedas. Só a página (nunca o token dos agentes) e só dono/equipe com nome; a pessoa vem do servidor, nunca do corpo.
+  const soPessoa = (res, req) => { // GET na mesma origem não manda Origin; o que barra o agente é o cabeçalho do token dele
+    const bloqueio = req.headers['x-v2-agente'] || (req.method !== 'GET' && !pageOrigin(req)) ? 'só a página do Escritório pode jogar'
+      : !req.pessoa?.nome || (req.pessoa.papel !== 'dono' && req.pessoa.papel !== 'equipe') ? 'só dono ou equipe com nome pode jogar' : '';
+    if (bloqueio) json(res, 403, { error: bloqueio });
+    return !bloqueio;
+  };
+  const respJogo = (res, r) => { const { status, ...resto } = r; return r.ok ? json(res, 200, resto) : json(res, status, { error: r.error }); };
+  const quemFez = (req) => ({ who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', status: 200 });
+  if (p === '/api/carteira' && method === 'GET') {
+    if (!soPessoa(res, req)) return;
+    const quem = chavePessoa(req.pessoa.nome);
+    return json(res, 200, { ok: true, saldo: saldoDe(quem), extrato: extratoDe(quem) });
+  }
+  if (p === '/api/jogos/desafio' && method === 'POST') {
+    if (!soPessoa(res, req)) return;
+    const body = await readBody(req);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'corpo inválido' });
+    const r = jogos.desafiar({ pessoa: req.pessoa, agentId: body.agente, aposta: body.aposta });
+    if (r.ok) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/desafio#${r.id}` });
+    return respJogo(res, r);
+  }
+  if ((m = /^\/api\/jogos\/([\w-]+)\/jogada$/.exec(p)) && method === 'POST') {
+    if (!soPessoa(res, req)) return;
+    const body = await readBody(req);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'corpo inválido' });
+    const r = jogos.jogar({ pessoa: req.pessoa, id: m[1], gesto: body.gesto, rodada: body.rodada }); // o gesto não vai para a auditoria
+    if (r.ok) {
+      auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/${m[1]}/jogada` });
+      if (r.fim) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/${m[1]}/fim#${r.resultado}` });
+    }
+    return respJogo(res, r);
+  }
+  if ((m = /^\/api\/jogos\/([\w-]+)$/.exec(p)) && method === 'GET') {
+    if (!soPessoa(res, req)) return;
+    return respJogo(res, jogos.ler({ pessoa: req.pessoa, id: m[1] }));
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });
