@@ -94,6 +94,11 @@ function paintTile(b: PixelBuf, kind: FloorKind, tx: number, ty: number, o: Floo
           if ((k + a) % 4 === 0) continue;
           if (odd) b.set(k, a, weave);
           else b.set(a, k, weave);
+          // Fio claro ao lado do sulco: a trama ganha relevo.
+          if (k % 3 === 1) {
+            if (odd) b.set(k, a + 1, shade(base, 0.02));
+            else b.set(a + 1, k, shade(base, 0.02));
+          }
         }
       }
       for (let i = 0; i < 3; i++) b.set(Math.floor(r(i) * 14) + 1, Math.floor(r(i + 9) * 14) + 1, shade(base, i % 2 ? 0.03 : -0.035));
@@ -113,6 +118,9 @@ function paintTile(b: PixelBuf, kind: FloorKind, tx: number, ty: number, o: Floo
           b.hline(qx * 8, qx * 8 + 6, qy * 8, shade(col, 0.02));
           b.hline(qx * 8, qx * 8 + 7, qy * 8 + 7, shade(col, -0.045));
           b.vline(qx * 8 + 7, qy * 8, qy * 8 + 7, shade(col, -0.045));
+          // Cruzamento do rejunte mais escuro e brilho de esmalte no canto da peça.
+          b.set(qx * 8 + 7, qy * 8 + 7, shade(col, -0.09));
+          b.set(qx * 8 + 1, qy * 8 + 1, shade(col, 0.04));
           if (r(qx + qy * 2) < 0.3) b.set(qx * 8 + 2 + Math.floor(r(5) * 4), qy * 8 + 2 + Math.floor(r(6) * 4), shade(col, -0.02));
         }
       }
@@ -126,7 +134,13 @@ function paintTile(b: PixelBuf, kind: FloorKind, tx: number, ty: number, o: Floo
         b.hline(0, TILE - 1, q * 8 + 7, grout);
         b.vline(q * 8 + 7, 0, TILE - 1, grout);
       }
-      for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) b.hline(qx * 8, qx * 8 + 2, qy * 8, '#fbfcfd');
+      for (let qy = 0; qy < 2; qy++) {
+        for (let qx = 0; qx < 2; qx++) {
+          b.hline(qx * 8, qx * 8 + 2, qy * 8, '#fbfcfd');
+          b.set(qx * 8 + 1, qy * 8 + 1, '#f8fafb');
+          b.set(qx * 8 + 7, qy * 8 + 7, '#c2cad2');
+        }
+      }
       if (r(1) < 0.4) b.set(Math.floor(r(2) * 14), Math.floor(r(3) * 14), '#e4eaef');
       break;
     }
@@ -183,10 +197,10 @@ function rgba(c: string): RGBA {
 const WOOD_TONES = ['#c99668', '#c48f61', '#cf9f72', '#c6925f'] as const;
 /** [tom][0 normal, 1 topo, 2 base, 3 veio, 4 emenda, 5 após emenda, 6 nó]. */
 const WOOD: readonly (readonly RGBA[])[] = WOOD_TONES.map((t) =>
-  [t, shade(t, 0.03), shade(t, -0.075), shade(t, -0.03), shade(t, -0.1), shade(t, 0.03), shade(t, -0.12)].map(rgba),
+  [t, shade(t, 0.03), shade(t, -0.075), shade(t, -0.03), shade(t, -0.1), shade(t, 0.03), shade(t, -0.12), shade(t, -0.16)].map(rgba),
 );
 
-/** Tábuas de madeira: 4px de altura, 48px de comprimento, emendas desencontradas, veios e nós. */
+/** Tábuas de madeira: 4px de altura, 48px de comprimento, emendas desencontradas, veios, nós e pregos nas pontas. */
 function paintWood(b: PixelBuf, x0: number, y0: number, seed: number): void {
   for (let py = 0; py < CHUNK_PX; py++) {
     const wy = y0 + py;
@@ -202,6 +216,7 @@ function paintWood(b: PixelBuf, x0: number, y0: number, seed: number): void {
       let k = 0;
       if (ix === 0) k = 4;
       else if (iy === 3) k = 2;
+      else if (iy === 2 && (ix === 3 || ix === 44) && (ph >>> 3) % 3 === 0) k = 7;
       else if (iy === 0) k = ix === 1 ? 5 : 1;
       else if (iy === 2 && ix === 10 + ((ph >>> 12) % 20) && (ph >>> 20) % 5 === 0) k = 6;
       else if (iy === 1 + ((ph >>> 5) % 2) && (ix + (ph >>> 8)) % 23 < 7) k = 3;
@@ -236,7 +251,8 @@ function paintConcrete(b: PixelBuf, x0: number, y0: number, seed: number): void 
       }
       const n = noise(wx, wy, 26, seed) * 0.6 + noise(wx, wy, 7, seed + 3) * 0.4;
       const lv = Math.min(LEVELS - 1, Math.floor(n * LEVELS));
-      b.put(px, py, sx === 0 || sy === 0 ? CONCRETE_EDGE[lv] : CONCRETE[lv]);
+      // Chanfro claro junto da junta (lado de dentro da placa) e borda oposta clara.
+      b.put(px, py, sx === 0 || sy === 0 ? CONCRETE_EDGE[lv] : sx === 30 || sy === 30 ? CONCRETE[Math.min(LEVELS - 1, lv + 2)] : CONCRETE[lv]);
     }
   }
 }
@@ -244,6 +260,7 @@ function paintConcrete(b: PixelBuf, x0: number, y0: number, seed: number): void 
 const MARBLE: readonly RGBA[] = Array.from({ length: LEVELS }, (_, i) => rgba(mix('#ebe8e3', '#f5f3f0', i / (LEVELS - 1))));
 const MARBLE_VEIN = [rgba('#e2e3e6'), rgba('#cfd2d7')] as const;
 const MARBLE_SEAM = rgba('#d6d3ce');
+const MARBLE_GLINT = rgba('#fdfcfb');
 
 /** Mármore branco em placas de 2x2 tiles com veios cinza contínuos dentro da placa. */
 function paintMarble(b: PixelBuf, x0: number, y0: number, seed: number): void {
@@ -262,6 +279,8 @@ function paintMarble(b: PixelBuf, x0: number, y0: number, seed: number): void {
       const v = veined ? Math.sin(wx * 0.08 + wy * (0.14 + ax * 0.1) + noise(wx, wy, 14, seed + 12) * 2.4 + ax * 6.28) : 0;
       if (v > 0.997) b.put(px, py, MARBLE_VEIN[1]);
       else if (v > 0.986) b.put(px, py, MARBLE_VEIN[0]);
+      else if (h3(wx, wy, 7, seed) % 89 === 0) b.put(px, py, MARBLE_GLINT);
+      else if ((wx & 31) === 0 || (wy & 31) === 0) b.put(px, py, MARBLE[LEVELS - 1]);
       else b.put(px, py, MARBLE[Math.min(LEVELS - 1, Math.floor(noise(wx, wy, 20, seed + 11) * LEVELS))]);
     }
   }

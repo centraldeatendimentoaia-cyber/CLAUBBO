@@ -637,6 +637,25 @@ describe('pisos e paredes', () => {
     expect(differ).toBeLessThan(CHUNK_PX / 3);
   });
 
+  it('os azulejos brancos têm brilho de esmalte e cruzamento de rejunte escuro', () => {
+    const c = floorChunk('tile_white', 0, 0, { seed: 1 });
+    const hex = (x: number, y: number) => {
+      const i = (y * CHUNK_PX + x) * 4;
+      return [c.data[i], c.data[i + 1], c.data[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join('');
+    };
+    expect(hex(1, 1)).toBe('f8fafb');
+    expect(hex(7, 7)).toBe('c2cad2');
+  });
+
+  it('o mármore tem pontos de brilho e o carpete, fio claro ao lado do sulco', () => {
+    const m = floorChunk('marble', 0, 0, { seed: 5 });
+    let glints = 0;
+    for (let i = 0; i < m.data.length; i += 4) if (m.data[i] === 0xfd && m.data[i + 1] === 0xfc && m.data[i + 2] === 0xfb) glints++;
+    expect(glints).toBeGreaterThan(0);
+    const t = floorChunk('carpet', 0, 0, { seed: 5, tint: '#c9d1dc', tint2: '#bdc6d3' });
+    expect(t.countOpaque()).toBe(CHUNK_PX * CHUNK_PX);
+  });
+
   it('paredes renderizam todos os padrões', () => {
     const patterns: WallPattern[] = ['plain', 'stripes', 'tiles', 'wood_panel', 'brick', 'glass', 'marble'];
     for (const p of patterns) {
