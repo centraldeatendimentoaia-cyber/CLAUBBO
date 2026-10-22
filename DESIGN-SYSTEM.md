@@ -114,3 +114,21 @@ Construtor (`builder.ts`), Operações (agentes, tarefas, rotinas, reuniões e c
 4. Contraste mínimo AA; `--ui-faint` é o piso para texto pequeno.
 5. Arte nova no mundo: 16 px por tile, contorno cinza-azulado, luz de cima e da esquerda, 3 a 4 tons por material.
 6. Mudar o contrato de `art/api.ts` só de forma aditiva.
+
+## 9. Sistema néon (painel da holding, menu de interação, jogos)
+
+Tokens em `client/src/ui/neon.css` (`:root`), usados pelas classes `hold-*`, `int-*` e `jogo-*`. Convive com as camadas das seções 2 a 4; não as substitui.
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--neon-noite` | `#1a0f2e` | fundo |
+| `--neon-roxo` | `#2a1452` | painéis |
+| `--neon-profundo` | `#0d0620` | sombra em degrau, ticker |
+| `--neon-rosa` / `--neon-turquesa` / `--neon-amarelo` / `--neon-lima` | `#ff4fa3` / `#3ad3d0` / `#ffd23f` / `#7cff6b` | destaques e estados (sempre com forma e texto) |
+| `--neon-branco` / `--neon-lilas` | `#ffffff` / `#a99cc9` | texto e estado parado |
+| `--neon-borda` | `3px solid` branco | botões e painéis |
+| `--neon-degrau` | `0 4px 0` profundo | sombra sem blur |
+| `--neon-fonte-titulo` / `--neon-fonte-corpo` | Pixelify Sans / system-ui | títulos / corpo |
+
+Regras: cor nunca sozinha (acompanha forma ou texto); `prefers-reduced-motion` desliga animações; texto do servidor entra só por `textContent`.
+Lacunas conhecidas: os componentes ainda são específicos de cada tela (não há `neon-btn`, `neon-card` ou `neon-tag` genéricos) e a fonte Pixelify Sans só é importada em `art/preview.ts`.
