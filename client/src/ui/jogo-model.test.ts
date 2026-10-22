@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apostasPossiveis, humorRotulo, mensagemDaFalha, resumoRodada, rotuloGesto, textoResultado } from './jogo-model';
+import { apostasPossiveis, humorEtiqueta, humorRotulo, mensagemDaFalha, resumoRodada, rotuloGesto, textoResultado } from './jogo-model';
 
 describe('rotuloGesto', () => {
   it('nomes em português; valor desconhecido não quebra', () => {
@@ -71,5 +71,13 @@ describe('humorRotulo', () => {
     expect(humorRotulo(undefined).palavra).toBe('neutro');
     expect(humorRotulo('__proto__').palavra).toBe('neutro');
     expect(humorRotulo('constructor').palavra).toBe('neutro');
+  });
+});
+
+describe('humorEtiqueta', () => {
+  it('só aparece fora do neutro, com ícone e palavra', () => {
+    expect(humorEtiqueta('animado')).toEqual({ icone: '😄', palavra: 'animado' });
+    expect(humorEtiqueta('chateado')?.palavra).toBe('chateado');
+    for (const h of ['neutro', undefined, '__proto__', 'raiva']) expect(humorEtiqueta(h as string | undefined)).toBeNull();
   });
 });

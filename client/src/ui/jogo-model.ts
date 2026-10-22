@@ -59,3 +59,9 @@ const HUMORES: Record<Humor, { icone: string; palavra: Humor }> = {
 
 /** Ícone E palavra: o humor nunca depende só de cor. Valor ausente ou desconhecido = neutro. */
 export const humorRotulo = (h: string | undefined): { icone: string; palavra: Humor } => (h !== undefined && Object.hasOwn(HUMORES, h) ? HUMORES[h as Humor] : HUMORES.neutro);
+
+/** Etiqueta ao lado do nome do agente: só quando o humor foge do neutro (discreta, sempre com ícone e palavra). */
+export const humorEtiqueta = (h: string | undefined): { icone: string; palavra: Humor } | null => {
+  const r = humorRotulo(h);
+  return r.palavra === 'neutro' ? null : r;
+};
