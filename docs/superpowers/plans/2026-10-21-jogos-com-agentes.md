@@ -49,11 +49,11 @@
   - `mover({ id, de, para, valor, texto }, now?): {ok:true, duplicado:boolean} | {ok:false, status:422, error}` — move `valor` de uma conta para outra de forma atômica; `id` é a chave de idempotência (mesmo `id` não move de novo); recusa se `de` ficaria negativa.
   - `totalGeral(): number` (soma de todas as contas, para testes de conservação).
 
-- [ ] **Step 1: Testes primeiro** em `carteiras.test.ts` com `V2_DATA` temporário (mesmo padrão de `xp.test.ts`): saldo inicial uma vez só; `mover` ok; `mover` repetido com o mesmo `id` devolve `duplicado` sem mover; saldo insuficiente devolve 422 sem alterar; `chavePessoa(' Ana ')` igual a `chavePessoa('ana')`; nomes `__proto__`/`constructor` viram contas comuns; extrato limitado a 20; `totalGeral` constante após várias movimentações.
-- [ ] **Step 2:** Rodar `npx vitest run server/core/carteiras.test.ts`; deve falhar (módulo não existe).
-- [ ] **Step 3: Implementar** `carteiras.mjs` em `data/carteiras.json` com `limpo()` como no `xp.mjs`; conferir e gravar sem `await` entre os dois passos; ids de movimentação guardados em `movimentos` e podados além dos últimos 500.
-- [ ] **Step 4:** Testes passam; `npm run check` verde.
-- [ ] **Step 5: Commit** `feat(jogos): carteiras de pessoas e agentes no servidor`.
+- [x] **Step 1: Testes primeiro** em `carteiras.test.ts` com `V2_DATA` temporário (mesmo padrão de `xp.test.ts`): saldo inicial uma vez só; `mover` ok; `mover` repetido com o mesmo `id` devolve `duplicado` sem mover; saldo insuficiente devolve 422 sem alterar; `chavePessoa(' Ana ')` igual a `chavePessoa('ana')`; nomes `__proto__`/`constructor` viram contas comuns; extrato limitado a 20; `totalGeral` constante após várias movimentações.
+- [x] **Step 2:** Rodar `npx vitest run server/core/carteiras.test.ts`; deve falhar (módulo não existe).
+- [x] **Step 3: Implementar** `carteiras.mjs` em `data/carteiras.json` com `limpo()` como no `xp.mjs`; conferir e gravar sem `await` entre os dois passos; ids de movimentação guardados em `movimentos` e podados além dos últimos 500.
+- [x] **Step 4:** Testes passam; `npm run check` verde.
+- [x] **Step 5: Commit** `feat(jogos): carteiras de pessoas e agentes no servidor`.
 
 ---
 
@@ -68,11 +68,11 @@
   - `humorDe(agentId: string, now?): 'animado'|'neutro'|'chateado'` (regra e prazo de 6 h das Global Constraints).
   - `falaDe(humor: string, resultado?: string): string` — textos curtos e fixos em português (pelo menos 2 variações por humor, escolha estável por `agentId` não necessária: aceitar `sorteio` opcional).
 
-- [ ] **Step 1: Testes primeiro:** sem partidas é `neutro`; duas vitórias do agente seguidas = `animado`; duas derrotas = `chateado`; vitória + derrota + empate = `neutro`; só as 5 últimas contam (seis partidas, a primeira cai fora); passadas 6 h volta a `neutro`; empate não altera a soma; `falaDe` nunca devolve string vazia para os três humores; id `__proto__` é comum.
-- [ ] **Step 2:** Rodar e ver falhar.
-- [ ] **Step 3: Implementar** `humor.mjs` no padrão do `xp.mjs`.
-- [ ] **Step 4:** Testes passam.
-- [ ] **Step 5: Commit** `feat(jogos): humor do agente a partir das partidas`.
+- [x] **Step 1: Testes primeiro:** sem partidas é `neutro`; duas vitórias do agente seguidas = `animado`; duas derrotas = `chateado`; vitória + derrota + empate = `neutro`; só as 5 últimas contam (seis partidas, a primeira cai fora); passadas 6 h volta a `neutro`; empate não altera a soma; `falaDe` nunca devolve string vazia para os três humores; id `__proto__` é comum.
+- [x] **Step 2:** Rodar e ver falhar.
+- [x] **Step 3: Implementar** `humor.mjs` no padrão do `xp.mjs`.
+- [x] **Step 4:** Testes passam.
+- [x] **Step 5: Commit** `feat(jogos): humor do agente a partir das partidas`.
 
 ---
 
@@ -90,11 +90,11 @@
   - Expiração: ao qualquer chamada, partidas sem jogada há mais de 2 minutos são encerradas devolvendo as apostas, sem tocar no humor.
   - O pagamento final move as duas apostas de `partida:<id>` para o vencedor (ou devolve a cada um, no empate), com `id` de movimentação `<partida>:fim` para idempotência. `registrarPartida` só roda no fim normal.
 
-- [ ] **Step 1: Testes primeiro** (sorteio e relógio injetados): abre partida reservando as apostas (saldos caem, `totalGeral` constante); vitória por 2 a 0; vitória por 2 a 1; rodada empatada repete e não conta; cinco rodadas sem vencedor = partida empatada com apostas devolvidas; aposta 7 → 400; aposta maior que o saldo → 422 sem reservar nada; agente sem saldo → 422; agente não ocioso → 409; segunda partida da mesma pessoa aberta → 409; segunda partida no mesmo agente → 409; intervalo de 10 s → 429; gesto inválido → 400; jogar numa partida de outra pessoa → 404; jogar partida encerrada → 409; expiração devolve as apostas e não altera o humor; `jogar` com `rodada` diferente da rodada atual (clique duplo, duas abas) → 409 sem avançar; conservação de moedas após 50 partidas aleatórias.
-- [ ] **Step 2:** Rodar e ver falhar.
-- [ ] **Step 3: Implementar** `jogos.mjs`. A rodada atual vem do servidor; `jogar` recebe `rodada` (número esperado) e responde 409 se diferir. Tudo síncrono entre conferir e gravar. Estado das partidas em `data/jogos.json` (partidas abertas e as últimas 50 encerradas), objetos sem protótipo.
-- [ ] **Step 4:** Testes passam; `npm run check` verde.
-- [ ] **Step 5: Commit** `feat(jogos): partida de pedra, papel e tesoura com apostas reservadas`.
+- [x] **Step 1: Testes primeiro** (sorteio e relógio injetados): abre partida reservando as apostas (saldos caem, `totalGeral` constante); vitória por 2 a 0; vitória por 2 a 1; rodada empatada repete e não conta; cinco rodadas sem vencedor = partida empatada com apostas devolvidas; aposta 7 → 400; aposta maior que o saldo → 422 sem reservar nada; agente sem saldo → 422; agente não ocioso → 409; segunda partida da mesma pessoa aberta → 409; segunda partida no mesmo agente → 409; intervalo de 10 s → 429; gesto inválido → 400; jogar numa partida de outra pessoa → 404; jogar partida encerrada → 409; expiração devolve as apostas e não altera o humor; `jogar` com `rodada` diferente da rodada atual (clique duplo, duas abas) → 409 sem avançar; conservação de moedas após 50 partidas aleatórias.
+- [x] **Step 2:** Rodar e ver falhar.
+- [x] **Step 3: Implementar** `jogos.mjs`. A rodada atual vem do servidor; `jogar` recebe `rodada` (número esperado) e responde 409 se diferir. Tudo síncrono entre conferir e gravar. Estado das partidas em `data/jogos.json` (partidas abertas e as últimas 50 encerradas), objetos sem protótipo.
+- [x] **Step 4:** Testes passam; `npm run check` verde.
+- [x] **Step 5: Commit** `feat(jogos): partida de pedra, papel e tesoura com apostas reservadas`.
 
 ---
 
@@ -111,11 +111,11 @@
   - `POST /api/jogos/desafio` `{agente, aposta}`; `POST /api/jogos/:id/jogada` `{gesto, rodada}`; `GET /api/jogos/:id`.
   - Campo `humor` em cada item do elenco de `/api/holding`, `/api/xp` e na lista de agentes que o menu lê.
 
-- [ ] **Step 1: Testes primeiro:** PHONE_WRITES casa `POST /api/jogos/desafio` e `POST /api/jogos/<id>/jogada` e não casa GET nem variantes com `..`/`%2F`; AUDITED casa as duas escritas; agente (`x-v2-agente`) e token sem nome recebem 403 nas quatro rotas (teste de rota no estilo dos testes de rota já existentes em `server/`).
-- [ ] **Step 2:** Rodar e ver falhar.
-- [ ] **Step 3: Implementar** as rotas no `bridge.mjs` depois do bloco `/obrigado`, com a mesma ordem de checagens (origem, papel, agente, nome), `auditRecord` com `nome` e `path` terminando em `#<id da partida>` na abertura e no fim.
-- [ ] **Step 4:** Subir servidor isolado (`BRIDGE_PORT=4599`, dados temporários) e rodar uma partida inteira por `curl`: 200 no desafio, jogadas até o fim, saldos conferidos em `GET /api/carteira`, 403 para agente e para token sem nome, 409 ao repetir rodada, e `humor` visível no elenco. Registrar as chamadas e os códigos no relatório.
-- [ ] **Step 5:** `npm run check` verde. **Commit** `feat(jogos): rotas de carteira e desafio com acesso por pessoa`.
+- [x] **Step 1: Testes primeiro:** PHONE_WRITES casa `POST /api/jogos/desafio` e `POST /api/jogos/<id>/jogada` e não casa GET nem variantes com `..`/`%2F`; AUDITED casa as duas escritas; agente (`x-v2-agente`) e token sem nome recebem 403 nas quatro rotas (teste de rota no estilo dos testes de rota já existentes em `server/`).
+- [x] **Step 2:** Rodar e ver falhar.
+- [x] **Step 3: Implementar** as rotas no `bridge.mjs` depois do bloco `/obrigado`, com a mesma ordem de checagens (origem, papel, agente, nome), `auditRecord` com `nome` e `path` terminando em `#<id da partida>` na abertura e no fim.
+- [x] **Step 4:** Subir servidor isolado (`BRIDGE_PORT=4599`, dados temporários) e rodar uma partida inteira por `curl`: 200 no desafio, jogadas até o fim, saldos conferidos em `GET /api/carteira`, 403 para agente e para token sem nome, 409 ao repetir rodada, e `humor` visível no elenco. Registrar as chamadas e os códigos no relatório.
+- [x] **Step 5:** `npm run check` verde. **Commit** `feat(jogos): rotas de carteira e desafio com acesso por pessoa`.
 
 ---
 
@@ -132,11 +132,11 @@
   - `jogo.ts`: `abrirJogo({ agente, aoFechar })` monta o painel (escolha da aposta, saldo, três botões com teclas 1, 2, 3, placar, revelação da jogada do agente, resultado, humor); fecha com Esc; guarda de clique único em voo (reaproveitar `criarGuarda` de `interacao-model.ts`); retoma partida aberta com `GET /api/jogos/:id`.
   - Em `interacao.ts`, a ação `desafiar` abre o painel no lugar do texto "Os jogos chegam no projeto 4".
 
-- [ ] **Step 1: Testes primeiro** dos modelos puros (apostas possíveis só até o menor saldo; mensagens por status; texto do resultado para vitória, derrota e empate) e do `interacao-model` (desafiar habilitado com agente ocioso e saldo ≥ 5; apagado com motivo "sem moedas" ou "só agente ocioso"; o teste existente com a ordem dos itens continua passando).
-- [ ] **Step 2:** Rodar e ver falhar.
-- [ ] **Step 3: Implementar** os modelos e a interface. Texto do servidor só por `h({text})`. `prefers-reduced-motion`: sem revelação animada. Estilos no sistema néon existente (variáveis de `neon.css`, sem cores soltas). No painel da holding, mostrar o saldo vindo de `GET /api/carteira`; se a chamada falhar, esconder o número em vez de mostrar o do navegador.
-- [ ] **Step 4:** `npm run check` e `npm run build` verdes.
-- [ ] **Step 5: Commit** `feat(jogos): painel de desafio no menu do agente`.
+- [x] **Step 1: Testes primeiro** dos modelos puros (apostas possíveis só até o menor saldo; mensagens por status; texto do resultado para vitória, derrota e empate) e do `interacao-model` (desafiar habilitado com agente ocioso e saldo ≥ 5; apagado com motivo "sem moedas" ou "só agente ocioso"; o teste existente com a ordem dos itens continua passando).
+- [x] **Step 2:** Rodar e ver falhar.
+- [x] **Step 3: Implementar** os modelos e a interface. Texto do servidor só por `h({text})`. `prefers-reduced-motion`: sem revelação animada. Estilos no sistema néon existente (variáveis de `neon.css`, sem cores soltas). No painel da holding, mostrar o saldo vindo de `GET /api/carteira`; se a chamada falhar, esconder o número em vez de mostrar o do navegador.
+- [x] **Step 4:** `npm run check` e `npm run build` verdes.
+- [x] **Step 5: Commit** `feat(jogos): painel de desafio no menu do agente`.
 
 ---
 
@@ -145,7 +145,7 @@
 **Files:**
 - Modify: `README.md` (seção "Jogos e moedas": regras, rotas, onde ficam os arquivos, como a equipe joga)
 
-- [ ] **Step 1:** Servidor isolado em outra porta com dados temporários, agentes de teste ociosos e uma pessoa da equipe cadastrada.
-- [ ] **Step 2:** No navegador: abrir o menu do agente ocioso, desafiar, jogar uma partida inteira pelo teclado e pelo mouse, conferir saldo, humor e extrato; recarregar no meio da partida e conferir que ela retoma; tentar jogar com a equipe e com agente ocupado.
-- [ ] **Step 3:** Escrever a seção do README e declarar o que não foi visto.
-- [ ] **Step 4:** `npm run check` e `npm run build` verdes. **Commit** `docs(jogos): README com regras, rotas e arquivos`.
+- [x] **Step 1 (feito por HTTP, `server/test/jogos-http.test.ts`):** Servidor isolado em outra porta com dados temporários, agentes de teste ociosos e uma pessoa da equipe cadastrada.
+- [ ] **Step 2 (NÃO FEITO no navegador; cobertura só por HTTP e testes de modelo):** No navegador: abrir o menu do agente ocioso, desafiar, jogar uma partida inteira pelo teclado e pelo mouse, conferir saldo, humor e extrato; recarregar no meio da partida e conferir que ela retoma; tentar jogar com a equipe e com agente ocupado.
+- [x] **Step 3 (README e CHANGELOG):** Escrever a seção do README e declarar o que não foi visto.
+- [x] **Step 4:** `npm run check` e `npm run build` verdes. **Commit** `docs(jogos): README com regras, rotas e arquivos`.
