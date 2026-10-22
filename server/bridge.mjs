@@ -58,6 +58,7 @@ import { criarBtw } from './core/btw.mjs';
 import { chavePessoa, extratoDe, saldoDe } from './core/carteiras.mjs';
 import { humoresDe } from './core/humor.mjs';
 import { criarJogos } from './core/jogos.mjs';
+import { listarEquipe, salvarPersonagem } from './core/personagens.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -855,6 +856,22 @@ ${logs}` : ''}`;
   if ((m = /^\/api\/jogos\/([\w-]+)$/.exec(p)) && method === 'GET') {
     if (!soPessoa(res, req)) return;
     return comFalha(res, () => respJogo(res, jogos.ler({ pessoa: req.pessoa, id: m[1] })));
+  }
+  // ---- equipe na barra: dono e pessoas cadastradas com o personagem de cada uma; a pessoa edita o próprio, o dono edita qualquer um.
+  if (p === '/api/equipe' && method === 'GET') {
+    if (!soPessoa(res, req)) return;
+    return comFalha(res, () => json(res, 200, { ok: true, equipe: listarEquipe(), eu: req.pessoa.nome }));
+  }
+  if ((m = /^\/api\/equipe\/([^/]+)\/personagem$/.exec(p)) && method === 'POST') {
+    if (!soPessoa(res, req)) return;
+    const body = await readBody(req);
+    return comFalha(res, () => {
+      let alvo;
+      try { alvo = decodeURIComponent(m[1]); } catch { return json(res, 400, { error: 'nome inválido' }); }
+      const r = salvarPersonagem({ quem: req.pessoa, alvo, corpo: body });
+      if (r.ok) auditRecord(config.data, { ...quemFez(req), path: `/api/equipe/${alvo}/personagem` });
+      return respJogo(res, r);
+    });
   }
   if (p === '/api/pendencias/aprovar-seguros' && method === 'POST') {
     if (!pageOrigin(req)) return json(res, 403, { error: 'só a página do Escritório pode aprovar' });

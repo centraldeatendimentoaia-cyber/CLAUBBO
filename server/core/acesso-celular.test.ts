@@ -120,6 +120,13 @@ describe('modo celular', () => {
       expect(phoneGate(req('PUT', c), url('/api/jogos/desafio'), TOKEN, 4530, team).action).toBe('deny');
     });
 
+    it('equipe: passa só POST /api/equipe/<nome>/personagem; GET, PUT e variantes com barra não são escrita do celular', () => {
+      const c = `v2_cel_4530=${ANA}`;
+      expect(phoneGate(req('POST', c), url('/api/equipe/Ana/personagem'), TOKEN, 4530, team).action).toBe('allow');
+      for (const p of ['/api/equipe/a/b/personagem', '/api/equipe//personagem', '/api/equipe/Ana/personagem/x', '/api/equipe/Ana']) expect(PHONE_WRITES.test(p)).toBe(false);
+      expect(phoneGate(req('PUT', c), url('/api/equipe/Ana/personagem'), TOKEN, 4530, team).action).toBe('deny');
+    });
+
     it('com V2_CELULAR_ESCRITA=1 só o token do dono escreve fora de aprovar/recusar; a equipe nunca (I2)', () => {
       process.env.V2_CELULAR_ESCRITA = '1';
       try {
