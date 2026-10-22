@@ -3326,4 +3326,22 @@ export const ES: Readonly<Record<string, string>> = {
   "escolhendo…": "eligiendo…",
   "Você": "Tú",
   "Jogar de novo": "Jugar de nuevo",
+
+  // client/src/art/badges.ts
+  "Faísca": "Chispa",
+  "Chama": "Llama",
+  "Cometa": "Cometa",
+  "Coroa": "Corona",
+  "Astro": "Astro",
+  "Primeiro brilho": "Primer brillo",
+  "Em ascensão": "En ascenso",
+  "Veterano": "Veterano",
+  "Lenda": "Leyenda",
+  "Dia limpo": "Día limpio",
+  "Ganhou o primeiro XP": "Ganó su primer XP",
+  "Chegou ao nível 3": "Llegó al nivel 3",
+  "Chegou ao nível 6": "Llegó al nivel 6",
+  "Chegou ao nível 10": "Llegó al nivel 10",
+  "Rotinas rodaram hoje e nenhuma falhou": "Las rutinas corrieron hoy y ninguna falló",
+  "{0} (nível {1})": "{0} (nivel {1})",
 };
