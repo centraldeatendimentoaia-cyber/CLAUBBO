@@ -123,7 +123,10 @@ export function criarGuarda() {
 export function aparenciaDoJogador(
   me?: { name: string; look: 'f' | 'm'; parts?: AppearanceParts },
   nome?: string,
+  eu?: { rotulo: string; look: 'f' | 'm'; parts?: AppearanceParts; custom: boolean },
 ): { name: string; look: 'f' | 'm'; parts?: AppearanceParts } {
+  // O personagem que a pessoa editou na barra da equipe vale mais que o do World e que o padrão.
+  if (eu?.custom && eu.parts) return { name: eu.rotulo, look: eu.look, parts: eu.parts };
   if (me) return { name: me.name, look: me.look, ...(me.parts ? { parts: me.parts } : {}) };
   const n = nome?.trim() || 'Você';
   const soma = [...n].reduce((t, c) => t + c.charCodeAt(0), 0);

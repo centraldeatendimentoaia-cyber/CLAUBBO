@@ -74,6 +74,7 @@ export class EquipeBar implements UiComponent {
       fechar();
       this.ctx.announce(ok);
       await this.atualizar();
+      globalThis.dispatchEvent?.(new Event('equipe:salvo'));
     };
     const salvar = h('button', { class: 'ui-btn ui-btn--primary', type: 'button', text: tr('Salvar'), on: { click: () => {
       const draft = fields.value;

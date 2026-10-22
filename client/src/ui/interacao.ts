@@ -3,6 +3,7 @@
 // e a rede. Todo texto vindo de agente ou do servidor entra só por h()/textContent, nunca como HTML.
 // Todos os papéis veem as mesmas ações: quem decide (403, 409) é o servidor.
 import { getFloor } from '../floor';
+import { lerEquipe } from '../net/equipe-api';
 import { agradecer, obrigadosPossiveis, perguntarBtw, saldoDaCarteira, trocarModelo } from '../net/interacao-api';
 import type { WorldSceneMe } from '../../../shared/world/api';
 import type { Alvo } from '../world/player';
@@ -107,10 +108,23 @@ export class Interacao {
       .catch(() => acabar(undefined));
   }
 
+  private meWorld: Pick<WorldSceneMe, 'name' | 'look' | 'parts'> | undefined;
+
   private ligarCom(me: Pick<WorldSceneMe, 'name' | 'look' | 'parts'> | undefined): void {
     if (this.ligado) return;
     this.ligado = true;
+    this.meWorld = me;
     this.player.ligar(aparenciaDoJogador(me));
+    void this.aplicarEquipe();
+    // Ao salvar o personagem no editor da equipe, o boneco do mapa muda junto (volta ao elevador).
+    globalThis.addEventListener?.('equipe:salvo', () => void this.aplicarEquipe());
+  }
+
+  /** Troca o boneco pelo personagem da pessoa na equipe, se ela o editou; sem equipe ou sem edição, fica como está. */
+  private async aplicarEquipe(): Promise<void> {
+    const d = await lerEquipe();
+    const eu = d?.equipe.find((p) => p.nome.toLowerCase() === d.eu.toLowerCase());
+    if (eu?.custom && eu.parts) this.player.ligar(aparenciaDoJogador(this.meWorld, undefined, eu));
   }
 
   // ---------------------------------------------------------------- dica e menu aberto: um laço por quadro

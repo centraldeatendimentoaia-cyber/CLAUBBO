@@ -141,6 +141,12 @@ describe('aparenciaDoJogador', () => {
   it('usa o me do World quando existe', () => {
     expect(aparenciaDoJogador({ name: 'Ana', look: 'f', parts: {} as never })).toMatchObject({ name: 'Ana', look: 'f' });
   });
+  it('o personagem editado na equipe vale mais que o do World; sem edição, não muda nada', () => {
+    const parts = { hairStyle: 'bob' } as never;
+    const world = { name: 'Ana', look: 'f' as const };
+    expect(aparenciaDoJogador(world, undefined, { rotulo: 'JMAL', look: 'm', parts, custom: true })).toEqual({ name: 'JMAL', look: 'm', parts });
+    expect(aparenciaDoJogador(world, undefined, { rotulo: 'JMAL', look: 'm', parts, custom: false })).toEqual(world);
+  });
   it('sem World: padrão estável por nome, sem parts', () => {
     const a = aparenciaDoJogador(undefined, 'Rui');
     expect(a).toEqual(aparenciaDoJogador(undefined, 'Rui'));
