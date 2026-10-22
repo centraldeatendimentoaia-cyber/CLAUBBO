@@ -58,12 +58,26 @@ Uma página só com o que espera decisão e o que merece avaliação. Abre pelo 
 - **Janela do Windows:** aprovar item perigoso (implementação e testes de agente de código, pedidos a terminais, propostas de agentes) continua abrindo a janela de confirmação no computador do servidor, como em "Token de acesso e confirmação". Item seguro não abre janela. Pelo celular, só o dono (token do QR code) dispensa a janela nas rotas de aprovar e recusar; a equipe não libera permissões de terminal, não libera chamada "para sempre" e não repete tarefa com ferramentas liberadas.
 - **XP:** só por resultado verificado: o dono clica em "Ficou bom" numa tarefa concluída sem erro, ou uma rotina termina sem erro. Cada evento conta uma única vez (repetir o clique não soma) e volume de mensagens ou tokens nunca dá XP. O celular e a equipe não conseguem avaliar.
 
+## Jogos e moedas
+
+O dono e a equipe cadastrada desafiam um agente ocioso para Pedra, Papel e Tesoura. Só moedas do jogo: nenhum dinheiro real, e o humor do agente é só expressão (nunca muda aura, modelo, nível, tarefa, custo ou prioridade).
+
+- **Como jogar:** chegue perto do agente, `E`, "Desafiar". Escolha a aposta (5, 10 ou 25), jogue com os botões ou com as teclas `1` (pedra), `2` (papel) e `3` (tesoura) e feche com `Esc`. O botão fica apagado, com o motivo, se o agente estiver ocupado ou faltar moeda. Recarregar a página no meio da partida retoma de onde parou.
+- **Regras:** melhor de 3, vence quem ganhar 2 rodadas. Rodada empatada se repete; passou de 5 rodadas, a partida empata e as apostas voltam. O servidor sorteia a jogada do agente só depois de receber a sua, e o navegador nunca a vê antes. Quem vence leva as duas apostas.
+- **Moedas:** cada pessoa e cada agente começa com 100, concedidas uma única vez. As duas apostas são reservadas ao abrir a partida, o saldo nunca fica negativo e moeda nunca é criada nem destruída. Partida sem jogada por 2 minutos expira e devolve as apostas, sem mexer no humor.
+- **Limites:** uma partida aberta por agente e uma por pessoa; 10 s de intervalo entre partidas da mesma pessoa com o mesmo agente. Cada pessoa tem a própria carteira (o nome vem do servidor, nunca do pedido); o painel da holding mostra a da pessoa logada.
+- **Humor:** `animado`, `neutro` ou `chateado`, pela soma das 5 últimas partidas do agente (vitória dele +1, derrota −1, empate 0): 2 ou mais é animado, −2 ou menos é chateado. Volta a neutro depois de 6 h sem partida. Aparece no menu do agente e no painel do jogo, com uma fala curta ao fim da partida (textos fixos, sem chamar modelo).
+- **Rotas** (só a página; agente com `x-v2-agente` e token sem nome recebem 403): `GET /api/carteira`, `POST /api/jogos/desafio` com `{agente, aposta}`, `POST /api/jogos/:id/jogada` com `{gesto, rodada}` e `GET /api/jogos/:id` (só quem abriu a partida lê). Erros: 400 corpo ou aposta inválidos, 404 agente ou partida, 409 agente ocupado, partida encerrada ou rodada fora de ordem (clique duplo conta uma vez), 410 partida expirada, 422 sem saldo, 429 intervalo. As escritas entram na auditoria com o nome, sem o gesto.
+- **Arquivos** (em `data/`): `carteiras.json`, `jogos.json` (partidas abertas e as últimas 50 encerradas) e `humor.json`. Código em `server/core/carteiras.mjs`, `jogos.mjs` e `humor.mjs`; painel em `client/src/ui/jogo.ts`.
+- **Como a equipe joga:** igual ao dono, pelo endereço com token de `node scripts/equipe.mjs add` (veja "Painel da holding"), com a carteira da própria pessoa.
+- **Testes:** `npx vitest run server/test/jogos-http.test.ts` sobe o servidor numa porta livre com dados temporários e joga uma partida inteira.
+
 ## Boneco e auras
 
 Você tem um boneco no mapa e anda até os agentes em vez de só clicar neles.
 
 - **Teclas:** setas ou `WASD` movem o boneco, `Shift` corre, `E` interage com o agente mais próximo, `1` a `6` escolhem uma ação do menu e `Esc` fecha.
-- **Menu do agente:** conversar, desafiar (os jogos chegam no projeto 4), `/btw` (pergunta avulsa de até 500 caracteres), agradecer (só vale quando há um resultado novo), puxar a orelha e baixar o modelo.
+- **Menu do agente:** conversar, desafiar (Pedra, Papel e Tesoura valendo moedas, veja "Jogos e moedas"), `/btw` (pergunta avulsa de até 500 caracteres), agradecer (só vale quando há um resultado novo), puxar a orelha e baixar o modelo.
 - **Escada de modelos:** subir e descer andam um degrau por vez. No Claude: haiku, sonnet, opus, fable. No Codex: gpt-5.1-codex-mini, gpt-5.2-codex, gpt-5.3-codex. O pedido leva o modelo que a pessoa viu na tela (`de`); se o agente já mudou, o servidor responde 409 e nada é gravado.
 - **Auras:** o modelo aparece em volta do agente. Só o `fable` tem a chama dourada; o `opus` tem um brilho intermediário; `haiku` e `sonnet` têm um brilho sutil. Com `prefers-reduced-motion` ativo, a aura fica parada.
 - **Equipe:** a equipe cadastrada (veja "Painel da holding") pode as mesmas ações do dono, inclusive pelo celular. O servidor audita cada ação com o nome de quem fez; pedido sem nome ou feito por agente recebe 403.
