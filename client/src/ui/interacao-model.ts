@@ -29,6 +29,8 @@ export interface AgenteMenu {
   obrigadoPossivel: boolean;
   /** A lista de quem pode receber obrigado ainda não chegou. */
   carregando?: boolean;
+  /** Agente de terminal (andar 2): o jogo é só dos agentes do Escritório. */
+  terminal?: boolean;
   /** Saldo da pessoa (GET /api/carteira); null ou ausente = ainda não se sabe. */
   saldoPessoa?: number | null;
 }
@@ -59,7 +61,7 @@ export function menuDoAgente(a: AgenteMenu): ItemMenu[] {
     return { acao, rotulo: `${nome} ${subir ? '▲' : '▼'} ${a.model} → ${destino}`, atalho, habilitado: true };
   };
   const semMoedas = typeof a.saldoPessoa === 'number' && a.saldoPessoa < APOSTA_MINIMA;
-  const motivoDesafio = !a.ocioso ? tr('só agente ocioso') : semMoedas ? tr('sem moedas') : undefined;
+  const motivoDesafio = a.terminal ? tr('agente de terminal não joga') : !a.ocioso ? tr('só agente ocioso') : semMoedas ? tr('sem moedas') : undefined;
   const desafio: ItemMenu = { acao: 'desafiar', rotulo: tr('Desafiar para um jogo'), atalho: '2', habilitado: !motivoDesafio, ...(motivoDesafio ? { motivo: motivoDesafio } : {}) };
   return [
     { acao: 'conversar', rotulo: 'Conversar / dar tarefa', atalho: '1', habilitado: true },

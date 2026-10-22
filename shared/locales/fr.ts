@@ -3309,6 +3309,7 @@ export const FR: Readonly<Record<string, string>> = {
   "O personagem voltou ao padrão JMAL.": "Le personnage est revenu au JMAL par défaut.",
   "só agente ocioso": "agents inactifs uniquement",
   "sem moedas": "pas de pièces",
+  "agente de terminal não joga": "les agents de terminal ne jouent pas",
   "Desafiar para um jogo": "Défier à un jeu",
   "Pedra": "Pierre",
   "Papel": "Papier",

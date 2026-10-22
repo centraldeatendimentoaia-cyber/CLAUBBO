@@ -265,7 +265,7 @@ export class Interacao {
     if (a.tipo === 'agente') {
       const ag = this.ctx.agent(a.id);
       if (!ag) return [];
-      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null, saldoPessoa: this.saldo });
+      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', terminal: !a.id.startsWith('escritorio:'), obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null, saldoPessoa: this.saldo });
     }
     return menuDoElevador(this.andares(), getFloor());
   }
