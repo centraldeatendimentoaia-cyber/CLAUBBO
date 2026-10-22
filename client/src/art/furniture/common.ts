@@ -514,33 +514,44 @@ export function pingpongTable(): BufFurniture {
   const s = floorSheet(3, 2, 8);
   const b = s.buf;
   const t = ramp('#2f72b8', 0.07);
-  // Pernas.
+  // Pernas com travessa e pés de borracha.
   for (const x of [4, 42]) {
-    b.rect(x, 22, 2, 9, '#3a3f4b');
-    b.vline(x, 22, 30, '#5a6070');
+    b.rect(x, 23, 3, 8, '#3a3f4b');
+    b.vline(x, 23, 30, '#5a6070');
+    b.rect(x - 1, 30, 5, 2, '#242832');
   }
-  b.rect(22, 22, 4, 7, '#3a3f4b');
-  // Tampo.
+  b.hline(6, 41, 27, '#4a5060');
+  b.rect(21, 22, 6, 7, '#3a3f4b');
+  b.vline(21, 22, 28, '#5a6070');
+  // Tampo: face azul com brilho diagonal, borda frontal grossa e avental.
   b.rect(0, -4, 48, 25, t.lt);
-  b.hline(0, 47, 20, t.dk);
-  b.hline(0, 47, 21, t.dd);
-  b.rect(0, 22, 48, 1, '#2a2e38');
-  // Linhas brancas: borda e linha central (ao longo do comprimento).
+  for (const [x0, y0] of [[7, 15], [11, 15]] as const) b.line(x0, y0, x0 + 6, y0 - 12, t.hi);
+  for (const [x0, y0] of [[31, 15], [35, 15]] as const) b.line(x0, y0, x0 + 6, y0 - 12, t.hi);
+  b.rect(0, 20, 48, 2, t.dk);
+  b.hline(0, 47, 20, t.base);
+  b.hline(0, 47, 22, t.dd);
+  b.rect(1, 23, 46, 1, '#242832');
+  // Linhas brancas: borda, linha central e traços de saque.
   b.hline(0, 47, -4, '#f4f6f8');
   b.hline(0, 47, 19, '#f4f6f8');
   b.vline(0, -4, 19, '#f4f6f8');
   b.vline(47, -4, 19, '#f4f6f8');
   b.hline(1, 46, 7, 'rgba(244,246,248,0.8)');
-  // Rede (corre norte-sul no meio), com altura.
+  b.hline(1, 46, 8, 'rgba(244,246,248,0.22)');
+  // Rede (corre norte-sul no meio): malha, fita branca no topo e postes com presilha.
   for (let y = -8; y <= 18; y++) {
     b.set(23, y, y % 2 ? 'rgba(240,244,248,0.55)' : 'rgba(40,46,60,0.45)');
     b.set(24, y, 'rgba(40,46,60,0.35)');
   }
-  b.hline(22, 25, -9, '#3a3f4b');
-  b.hline(22, 25, 19, '#3a3f4b');
   b.vline(22, -9, 15, '#f4f6f8');
+  b.rect(21, -10, 5, 3, '#3a3f4b');
+  b.hline(21, 25, -10, '#8b93a3');
+  b.rect(21, 18, 5, 3, '#3a3f4b');
+  b.hline(21, 25, 18, '#8b93a3');
+  // Cantos arredondados.
+  for (const [x, y] of [[0, -4], [47, -4]] as const) b.clear(x, y);
   b.outline();
-  contact(b, 0, 27, 48, 5, 0.22);
+  contact(b, 0, 28, 48, 4, 0.24);
   return { base: s };
 }
 

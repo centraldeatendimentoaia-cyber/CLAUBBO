@@ -472,6 +472,18 @@ describe('móveis', () => {
     expect(scr?.h).toBe(9);
   });
 
+  it('ping-pong: rede no meio do comprimento e sprite do tamanho do footprint 3x2 mais margens', () => {
+    const base = renderFurniture('pingpong_table').base;
+    expect(FURNITURE.pingpong_table.footprint).toEqual({ w: 3, h: 2 });
+    expect(base.buf.w).toBeLessThanOrEqual(3 * TILE + 2);
+    expect(Math.abs(base.ax - base.buf.w / 2)).toBeLessThanOrEqual(1);
+    // a rede (coluna do centro) tem pixels em quase toda a altura do tampo
+    const mid = Math.round(base.ax);
+    let filled = 0;
+    for (let y = 0; y < base.buf.h; y++) if (base.buf.alpha(mid, y) > 0) filled++;
+    expect(filled).toBeGreaterThan(24);
+  });
+
   it('fliperama: tela de 10x7 dentro do sprite, cabe em um tile mais as margens e âncora no pé do gabinete', () => {
     const base = renderFurniture('arcade').base;
     const scr = base.rects?.screen;
