@@ -159,6 +159,6 @@ describe('equipe na barra', () => {
   });
   it('o reset volta ao personagem sorteado', async () => {
     const r = await page('POST', '/api/equipe/dono/personagem', { reset: true });
-    expect(r.status).toBe(200); expect(r.body.pessoa.custom).toBe(false);
+    expect(r.status).toBe(200); expect(r.body.pessoa).toMatchObject({ custom: false, costume: 'jmal' }); expect(r.body.pessoa.parts).toBeUndefined();
   });
 });
