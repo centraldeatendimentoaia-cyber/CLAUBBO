@@ -4,6 +4,7 @@
 import '@fontsource/pixelify-sans/400.css';
 import * as art from './index';
 import { pixelText, pixelTextWidth } from './pixelfont';
+import { achievementsOf, badgeCanvas, levelTier, type BadgeSpec } from './badges';
 import {
   FURNITURE,
   TILE,
@@ -719,6 +720,29 @@ function games(): void {
   }, '#e9ecf1', 6);
 }
 
+// ------------------------------------------------------------------ distintivos
+
+function badges(): void {
+  const s = section('distintivos', 'Distintivos', 'Faixas de nível (cinco silhuetas, pontos contam a faixa) e medalhas de conquista, ganhas e por ganhar, em 1× e 6×.');
+  const cell = 24;
+  const pitch = 64;
+  const specs: { spec: BadgeSpec; name: string }[] = [
+    ...([1, 3, 5, 8, 12] as const).map((n) => ({ spec: { kind: 'tier', tier: levelTier(n).tier } as BadgeSpec, name: levelTier(n).name })),
+    ...achievementsOf({ nivel: 10, xp: 1, rotinas: { rodaram: 1, falharam: 0 } }).map((a) => ({ spec: { kind: 'achievement', id: a.id, earned: true } as BadgeSpec, name: a.name })),
+    ...achievementsOf({ nivel: 1, xp: 0 }).map((a) => ({ spec: { kind: 'achievement', id: a.id, earned: false } as BadgeSpec, name: `${a.name} -` })),
+  ];
+  const cols = 5;
+  canvas(s, cols * pitch, Math.ceil(specs.length / cols) * (cell + 12), (ctx) => {
+    specs.forEach((it, i) => {
+      const x = (i % cols) * pitch;
+      const y = Math.floor(i / cols) * (cell + 12);
+      ctx.drawImage(badgeCanvas(it.spec), x + 4, y + 4);
+      ctx.drawImage(badgeCanvas(it.spec), x + 24, y + 4, 16, 16);
+      label(ctx, it.name, x + 1, y + cell + 6);
+    });
+  }, '#1a0f2e', 4);
+}
+
 // ------------------------------------------------------------------ superfícies
 
 function floors(): void {
@@ -922,6 +946,7 @@ poses();
 heldItems();
 furniture();
 games();
+badges();
 floors();
 walls();
 screens();
