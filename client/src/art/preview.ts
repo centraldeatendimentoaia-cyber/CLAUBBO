@@ -693,6 +693,32 @@ function furniture(): void {
   });
 }
 
+// ------------------------------------------------------------------ jogos do lounge
+
+/** Fliperama (par, como no lounge) e mesa de ping-pong ampliados sobre madeira, para conferir o desenho de perto. */
+function games(): void {
+  const s = section('jogos', 'Jogos do lounge', 'Fliperama (par de gabinetes, um com a tela de partida) e mesa de ping-pong em 6×, sobre o piso de madeira do lounge. Âncora em magenta.');
+  const w = 10 * TILE;
+  const h = 6 * TILE;
+  canvas(s, w, h, (ctx, t) => {
+    art.drawFloor(ctx, 'wood', 0, 0, w, h, { seed: 3 });
+    const arc = art.furnitureSprites('arcade');
+    for (const [i, tx] of [1, 2].entries()) {
+      const ax = tx * TILE + TILE / 2;
+      const ay = 3 * TILE;
+      const r = arc.base.rects?.screen;
+      blit(ctx, arc.base, ax, ay);
+      if (r && i === 1) art.drawScreen(ctx, { x: ax - arc.base.ax + r.x, y: ay - arc.base.ay + r.y, w: r.w, h: r.h }, 'game', t, 5);
+      anchorMark(ctx, ax, ay);
+    }
+    const pp = art.furnitureSprites('pingpong_table');
+    const px = 6 * TILE + (3 * TILE) / 2;
+    const py = 4 * TILE;
+    blit(ctx, pp.base, px, py);
+    anchorMark(ctx, px, py);
+  }, '#e9ecf1', 6);
+}
+
 // ------------------------------------------------------------------ superfícies
 
 function floors(): void {
@@ -895,6 +921,7 @@ characters();
 poses();
 heldItems();
 furniture();
+games();
 floors();
 walls();
 screens();
