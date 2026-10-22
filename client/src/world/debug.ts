@@ -4,7 +4,7 @@
 import type { Activity, AgentInfo, AgentStatus, RoomInfo, ShellJob } from '../../../shared/types';
 import { SPECIAL, type ShellOutcome } from '../../../shared/activity';
 import { hash32 } from '../../../shared/hash';
-import { TILE } from '../art/api';
+import { TILE, type Dir } from '../art/api';
 import type { Camera } from './camera';
 import type { Renderer } from './render/renderer';
 import { oldestShell } from './sim/shell';
@@ -66,6 +66,8 @@ export interface WorldDebug {
   socialize(kind: GatherKind, ids?: string[]): string[] | null;
   /** Rodas em andamento: tipo, fase, participantes, placar e aposta. */
   gatherings(): unknown;
+  /** Põe o boneco do jogador num ponto (tiles) do andar na tela, olhando para `dir`. false se não há boneco. */
+  placePlayer(tx: number, ty: number, dir?: Dir): boolean;
   /** Soma (ou tira) moedinhas da carteira de um agente. Retorna o saldo. */
   coins(agentId: string, delta: number): number;
   /**
@@ -352,6 +354,15 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
         score: g.score,
         members: g.members.map((m) => ({ name: sim.chars.get(m.id)?.info.name ?? m.id, role: m.role, arrived: m.arrived, left: m.left, pose: m.pose })),
       })),
+
+    placePlayer: (tx, ty, dir) => {
+      const v = sim.visitor;
+      if (!v) return false;
+      v.x = tx * TILE;
+      v.y = ty * TILE;
+      if (dir) v.dir = dir;
+      return true;
+    },
 
     coins: (id, delta) => {
       const w = sim.social.wallets.get(id);

@@ -593,6 +593,10 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       const s = playerSim();
       return s && !playback ? alvoDoJogador(s) : null;
     },
+    posicao: () => {
+      const v = playerSim()?.visitor;
+      return playerMe && v ? { andar: playerFloor, x: v.x / TILE, y: v.y / TILE, dir: v.dir } : null;
+    },
     alvoNaTela: () => {
       const s = playerSim();
       if (!s || s !== sim || playback) return null;

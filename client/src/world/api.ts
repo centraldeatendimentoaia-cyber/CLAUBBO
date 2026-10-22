@@ -6,6 +6,7 @@ export type Selection = { type: 'agent'; id: string } | { type: 'room'; id: stri
 
 import type { PetsConfig } from './pets/config';
 import type { AgentInfo } from '../../../shared/types';
+import type { Dir } from '../art/api';
 import type { Alvo } from './player';
 import type { VisitorIntent } from './sim/visitor';
 
@@ -178,6 +179,8 @@ export interface PlayerWorld {
   setIntent(i: VisitorIntent): void;
   /** O agente ou elevador mais perto, à frente do boneco; null se não há. */
   alvo(): Alvo | null;
+  /** Onde o boneco está: andar e posição em tiles; null sem boneco ou parado no elevador. */
+  posicao(): { andar: number; x: number; y: number; dir: Dir } | null;
   /** Onde desenhar a dica do alvo (px CSS), ou null fora da tela. */
   alvoNaTela(): { x: number; y: number } | null;
   /** Com o boneco perto de um elevador: ele entra, e aparece no elevador do andar de destino. false se não pode agora. */
