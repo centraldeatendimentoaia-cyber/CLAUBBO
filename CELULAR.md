@@ -1,12 +1,22 @@
 # Abrir o Claubbo no celular
 
-Mostra o escritório no celular, no mesmo Wi-Fi, para **ver e usar** (mandar mensagens, mexer em agentes, aprovar ou recusar pedidos). Só aprovar e recusar dispensam a janela de confirmação do Windows; o resto que roda código ainda pede o "sim" no computador.
+Mostra o escritório no celular, no mesmo Wi-Fi, para **ver e usar** (mandar mensagens, mexer em agentes, aprovar ou recusar pedidos) e para **andar pelo mapa** com o seu boneco. Só aprovar e recusar dispensam a janela de confirmação do Windows; o resto que roda código ainda pede o "sim" no computador.
 
 1. Abra o terminal e digite `claude` (ou `codex`) na pasta onde o Claubbo foi instalado.
 2. Copie o prompt abaixo (o bloco inteiro) e cole. Aperte Enter.
 3. Aprove o que ele pedir (firewall e reinício do servidor) e escaneie o QR code com a câmera do celular.
 
 Para voltar ao normal, peça: "desligue o Claubbo no celular".
+
+## Andar pelo mapa no celular
+
+Em tela de toque aparecem, por cima do mapa, um **direcional** (embaixo à esquerda), o botão **E** (interagir) e o botão **»** (correr), que fazem o mesmo que as setas, a tecla E e o Shift do teclado.
+
+- Segure uma seta para andar; na primeira caminhada a câmera chega mais perto. O botão **E** acende quando há algo à frente (um agente, o elevador ou um móvel: fliperama, mesa de ping-pong, máquina de café, lousa, sofá...).
+- Toque no **E** para abrir o menu do que está à frente e toque numa opção. Com um menu ou um jogo aberto, os controles somem e os botões do próprio painel ficam grandes para o dedo.
+- Dá para jogar pedra, papel e tesoura pelo celular (chamar um agente ocioso no fliperama ou na mesa de ping-pong, apostar e jogar), perguntar `/btw`, agradecer e trocar o modelo, usando o mesmo menu do computador. Mandar mensagem ou dar tarefa a um agente continua exigindo `V2_CELULAR_ESCRITA=1`.
+- **Presença ao vivo:** quem está com o Claubbo aberto aparece como boneco no mapa dos outros, com o nome (o seu aparece no computador e vice-versa). O celular entra com o nome `celular`. Só o dono e a equipe com nome aparecem e veem os outros; o servidor não guarda a posição em disco, e o boneco some quando a página fecha.
+- A presença e o direcional funcionam também **sem** `V2_CELULAR_ESCRITA`: avisar a posição é a única escrita extra liberada ao celular nesse modo (`/api/presenca`), além de aprovar, recusar e das rotas do menu de interação que já eram liberadas. O resto continua somente leitura, e a trava e o token do QR code seguem valendo.
 
 ## Como funciona
 

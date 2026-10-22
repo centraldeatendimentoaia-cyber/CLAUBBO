@@ -26,10 +26,10 @@
 - [x] Teste com duas abas e duas pessoas no navegador.
 
 ### 4. Celular controla tudo
-- [ ] Direcional na tela que chama `player.setIntent`, visível só em tela de toque.
-- [ ] Botão de interação (E) e menus operáveis por toque; jogo pelo celular.
-- [ ] `phoneGate`: liberar só as rotas que o menu usa, mantendo o token do QR code e a trava `V2_CELULAR_ESCRITA`; testes de acesso.
-- [ ] Atualizar `CELULAR.md` e testar com viewport e toque no Chrome.
+- [x] Direcional na tela que chama `player.setIntent`, visível só em tela de toque.
+- [x] Botão de interação (E) e menus operáveis por toque; jogo pelo celular.
+- [x] `phoneGate`: liberar só as rotas que o menu usa, mantendo o token do QR code e a trava `V2_CELULAR_ESCRITA`; testes de acesso.
+- [x] Atualizar `CELULAR.md` e testar com viewport e toque no Chrome.
 
 ## Fechamento de cada entrega
 `npm test`, teste no navegador, `npm run check`, `tsc -b`, `npm run build` e `npm run i18n:check` (sem texto novo sem tradução), commits pequenos em português.

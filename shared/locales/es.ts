@@ -3396,4 +3396,13 @@ export const ES: Readonly<Record<string, string>> = {
   "Agora são {0}.": "Ahora son las {0}.",
   "Chamar {0} para jogar": "Invitar a {0} a jugar",
   "Ninguém livre para jogar agora. Tente quando um agente estiver ocioso.": "Nadie está libre para jugar ahora. Prueba cuando un agente esté inactivo.",
+
+  // client/src/ui/controles-toque.ts
+  "Andar": "Mover",
+  "Andar para cima": "Mover hacia arriba",
+  "Andar para a esquerda": "Mover a la izquierda",
+  "Andar para a direita": "Mover a la derecha",
+  "Andar para baixo": "Mover hacia abajo",
+  "Interagir": "Interactuar",
+  "Correr": "Correr",
 };

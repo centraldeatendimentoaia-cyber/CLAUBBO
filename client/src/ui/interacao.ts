@@ -168,13 +168,19 @@ export class Interacao {
   // ---------------------------------------------------------------- teclado
 
   private teclaAbrir(e: KeyboardEvent): void {
-    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'e' || this.painel || !this.ligado || this.naCidade()) return;
-    if (alvoDigitando(e.target) || document.querySelector('dialog[open], :not(dialog)[aria-modal="true"]')) return;
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'e' || alvoDigitando(e.target)) return;
+    if (this.acionar()) e.preventDefault();
+  }
+
+  /** O que o E faz: abre o menu do alvo à frente do boneco. Também é o botão de interagir da tela de toque. false se não havia nada a abrir. */
+  acionar(): boolean {
+    if (this.painel || !this.ligado || this.naCidade()) return false;
+    if (document.querySelector('dialog[open], :not(dialog)[aria-modal="true"]')) return false;
     const alvo = this.player.alvo();
     const pos = alvo && this.player.alvoNaTela();
-    if (!alvo || !pos) return; // sem alvo à vista, o E não faz nada
-    e.preventDefault();
+    if (!alvo || !pos) return false; // sem alvo à vista, o E não faz nada
     this.abrir(alvo, pos);
+    return true;
   }
 
   /** Com o painel aberto, o teclado é todo dele: o resto do app não vê a tecla (o comportamento padrão do navegador continua). */
@@ -482,7 +488,7 @@ export class Interacao {
 }
 
 /** Liga o menu de interação se o mundo tem boneco (não existe na cena Visita). Chamado por ui/index.ts. */
-export function criarInteracao(ctx: UiContext, naCidade: () => boolean, disponivel: () => boolean): Interacao | null {
+export function criarInteracao(ctx: UiContext, naCidade: () => boolean, disponivel: () => boolean): { interacao: Interacao; player: PlayerWorld } | null {
   const player = (ctx.world as { player?: PlayerWorld }).player;
-  return player ? new Interacao(ctx, player, naCidade, disponivel) : null;
+  return player ? { interacao: new Interacao(ctx, player, naCidade, disponivel), player } : null;
 }

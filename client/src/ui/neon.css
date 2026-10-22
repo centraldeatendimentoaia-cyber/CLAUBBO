@@ -146,3 +146,21 @@
 .jogo button:focus-visible { outline: 3px solid var(--neon-amarelo); outline-offset: 2px; }
 @keyframes jogo-piscar { 50% { opacity: 0.2; } }
 @media (prefers-reduced-motion: reduce) { .jogo-mesa.is-revelando span:last-child { animation: none; } .jogo .int-btn:active { transform: none; } }
+
+/* Controles do boneco em tela de toque (ui/controles-toque.ts): direcional embaixo à esquerda, interagir e correr à direita. */
+.toque { position: fixed; z-index: 55; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-bottom)); pointer-events: none; }
+.toque[hidden] { display: none; }
+.toque-pad { position: relative; width: 168px; height: 168px; pointer-events: auto; }
+.toque-btn { display: grid; place-items: center; width: 56px; height: 56px; padding: 0; font: 800 22px var(--neon-fonte-corpo); color: var(--neon-branco); background: var(--neon-roxo); border: var(--neon-borda); border-radius: 12px; box-shadow: var(--neon-degrau); opacity: 0.88; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; pointer-events: auto; cursor: pointer; }
+.toque-btn.is-on, .toque-btn:active { background: var(--neon-amarelo); color: var(--neon-profundo); box-shadow: none; transform: translate(2px, 2px); }
+.toque-pad .toque-btn { position: absolute; }
+.toque-up { left: 56px; top: 0; }
+.toque-left { left: 0; top: 56px; }
+.toque-right { left: 112px; top: 56px; }
+.toque-down { left: 56px; top: 112px; }
+.toque-acoes { display: flex; align-items: flex-end; gap: 12px; }
+.toque-agir { width: 76px; height: 76px; font-size: 30px; border-radius: 50%; }
+.toque-agir[aria-disabled="true"] { opacity: 0.45; box-shadow: none; }
+.toque-agir.is-livre { background: var(--neon-amarelo); color: var(--neon-profundo); opacity: 1; }
+.toque-correr[aria-pressed="true"] { background: var(--neon-amarelo); color: var(--neon-profundo); }
+@media (prefers-reduced-motion: reduce) { .toque-btn.is-on, .toque-btn:active { transform: none; } }
