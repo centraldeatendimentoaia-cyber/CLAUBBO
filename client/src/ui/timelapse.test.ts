@@ -28,6 +28,7 @@ vi.mock('./topbar', () => ({ TopBar: class {
   panelGroup = { prepend() {} };
   addPanelButton() {}
   addStatus() {}
+  addEquipe() {}
   render() {}
 } }));
 

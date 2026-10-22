@@ -16,14 +16,19 @@ export class EquipeBar implements UiComponent {
   readonly el: HTMLElement;
   private dados: Equipe | null = null;
   private aberto: HTMLElement | null = null;
+  private pedido = false;
 
   constructor(private readonly ctx: UiContext) {
     this.el = h('div', { class: 'ui-equipe', role: 'group', attrs: { 'aria-label': 'Equipe' }, hidden: true });
-    void this.atualizar();
-    window.addEventListener('focus', () => void this.atualizar());
+    globalThis.addEventListener?.('focus', () => void this.atualizar()); // sem window (testes) não há o que ouvir
   }
 
-  render(): void { /* o estado vem do servidor, não do snapshot */ }
+  /** Busca a equipe na primeira vez que o escritório conecta; depois só ao voltar o foco ou salvar. */
+  render(): void {
+    if (this.pedido || this.ctx.store.connection !== 'open') return;
+    this.pedido = true;
+    void this.atualizar();
+  }
 
   /** Lê a equipe de novo; sem acesso (sem nome, rede caiu) a faixa some em vez de mostrar dado velho. */
   async atualizar(): Promise<void> {

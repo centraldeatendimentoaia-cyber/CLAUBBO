@@ -187,7 +187,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   const sound = new SoundControl(ctx);
   const notifier = new Notifier(ctx, sound.board);
   topbar = new TopBar(ctx);
-  topbar.addEquipe(new EquipeBar(ctx).el);
+  const equipe = new EquipeBar(ctx);
+  topbar.addEquipe(equipe.el);
   sidebar = new Sidebar(ctx);
   // Terminal interativo (Claude Code de verdade, dentro do navegador): abrir, assumir e encerrar sessões.
   const pty = new PtyPanel(ctx);
@@ -315,7 +316,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   }));
   drawer.onLayoutChange = () => applyLayout();
 
-  const components: UiComponent[] = [topbar, sidebar, drawer, terminal, pty, history, deliveries, feed, toasts, settings, empty, banner, tip, notifier, splash, timelapse, sound, day, updateToaster, worldDialog, popups, worldChip];
+  const components: UiComponent[] = [topbar, equipe, sidebar, drawer, terminal, pty, history, deliveries, feed, toasts, settings, empty, banner, tip, notifier, splash, timelapse, sound, day, updateToaster, worldDialog, popups, worldChip];
   if (scene) components.push(scene);
   root.append(worldSocial.el);
   components.push(worldSocial);
