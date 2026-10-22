@@ -860,7 +860,7 @@ ${logs}` : ''}`;
   // ---- equipe na barra: dono e pessoas cadastradas com o personagem de cada uma; a pessoa edita o próprio, o dono edita qualquer um.
   if (p === '/api/equipe' && method === 'GET') {
     if (!soPessoa(res, req)) return;
-    return comFalha(res, () => json(res, 200, { ok: true, equipe: listarEquipe(), eu: req.pessoa.nome }));
+    return comFalha(res, () => json(res, 200, { ok: true, equipe: listarEquipe(), eu: req.pessoa.nome, euPapel: req.pessoa.papel }));
   }
   if ((m = /^\/api\/equipe\/([^/]+)\/personagem$/.exec(p)) && method === 'POST') {
     if (!soPessoa(res, req)) return;
