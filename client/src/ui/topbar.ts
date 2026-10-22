@@ -194,6 +194,11 @@ export class TopBar implements UiComponent {
     this.status.append(el);
   }
 
+  /** Faixa da equipe (avatares), logo depois da marca. */
+  addEquipe(el: HTMLElement): void {
+    this.el.querySelector('.ui-topbar__left')?.append(el);
+  }
+
   /** Botão Mundo (troca de cena), ao lado do Timelapse. */
   addSceneButton(btn: HTMLElement): void {
     this.panelGroup.insertBefore(btn, this.timelapseBtn);

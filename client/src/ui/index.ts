@@ -41,6 +41,7 @@ import { TimelapsePlayer } from './timelapse';
 import { Toasts } from './toasts';
 import { UpdateToaster } from './version';
 import { TopBar } from './topbar';
+import { EquipeBar } from './equipe';
 import { UpdateBanner } from './update';
 import { WorldPopups } from './world/world-popups';
 import { WorldChip } from './world/world-chip';
@@ -186,6 +187,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   const sound = new SoundControl(ctx);
   const notifier = new Notifier(ctx, sound.board);
   topbar = new TopBar(ctx);
+  topbar.addEquipe(new EquipeBar(ctx).el);
   sidebar = new Sidebar(ctx);
   // Terminal interativo (Claude Code de verdade, dentro do navegador): abrir, assumir e encerrar sessões.
   const pty = new PtyPanel(ctx);
