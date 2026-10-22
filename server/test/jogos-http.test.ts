@@ -118,6 +118,21 @@ describe('quem não pode jogar e casos recusados', () => {
   });
 });
 
+describe('id do agente como o menu do mapa manda', () => {
+  // Regressão: o menu "Desafiar" usa o id do snapshot (`escritorio:<id>`) e o servidor respondia 404 "agente não encontrado".
+  it('desafiar com `escritorio:<id>` abre a partida do agente certo', async () => {
+    await novoAgente('jogador-d');
+    const r = await page('POST', '/api/jogos/desafio', { agente: 'escritorio:jogador-d', aposta: 5 });
+    expect(r.status).toBe(200); expect(r.body).toMatchObject({ ok: true, rodada: 1 });
+    const aberta = JSON.parse(fs.readFileSync(data('jogos.json'), 'utf8')).partidas[r.body.id];
+    expect(aberta.agentId).toBe('jogador-d'); // a carteira e o humor do agente são do id puro
+    expect((await page('POST', '/api/jogos/desafio', { agente: 'escritorio:jogador-d', aposta: 5 })).status).toBe(409); // a trava de "uma partida aberta" vale
+  });
+  it('agente de terminal (andar 2) continua sem jogo: 404', async () => {
+    expect((await page('POST', '/api/jogos/desafio', { agente: '.claude:123', aposta: 5 })).status).toBe(404);
+  });
+});
+
 describe('agente ocupado', () => {
   it('com tarefa em andamento recusa o desafio com 409 e nenhuma moeda sai', async () => {
     await novoAgente('jogador-c');

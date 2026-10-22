@@ -836,7 +836,7 @@ ${logs}` : ''}`;
     if (!soPessoa(res, req)) return;
     const body = await readBody(req);
     return comFalha(res, () => {
-      const r = jogos.desafiar({ pessoa: req.pessoa, agentId: body.agente, aposta: body.aposta });
+      const r = jogos.desafiar({ pessoa: req.pessoa, agentId: typeof body.agente === 'string' ? body.agente.replace(/^escritorio:/, '') : body.agente, aposta: body.aposta }); // o menu do mapa manda o id do snapshot
       if (r.ok) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/desafio#${r.id}` });
       return respJogo(res, r);
     });
