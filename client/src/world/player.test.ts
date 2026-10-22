@@ -4,7 +4,8 @@ import type { AgentInfo, OfficeSnapshot, RoomInfo } from '../../../shared/types'
 import type { Appearance, ArtModule, RoomTheme } from '../art/api';
 import { DEFAULT_WORLD_OPTIONS } from './api';
 import { TILE } from './constants';
-import { alvoDoJogador, alvoMaisPerto, posicaoDoAlvo } from './player';
+import { alvoDoJogador, alvoMaisPerto, objetoMaisPerto, posicaoDoAlvo } from './player';
+import { objetosDoPredio, type ObjetoCand } from './objetos';
 import { Sim } from './sim/sim';
 import { VISITOR_ID, visitorInfo } from './sim/visitor';
 
@@ -162,5 +163,49 @@ describe('o jogador dentro do escritório (Sim fora do modo visita)', () => {
     const { sim } = escritorio();
     expect(sim.visitor).toBeNull();
     expect(alvoDoJogador(sim)).toBeNull();
+  });
+});
+
+describe('objetoMaisPerto', () => {
+  const obj = (id: string, x: number, y: number, w = 2, h = 1): ObjetoCand => ({ id, kind: 'sofa', categoria: 'sentar', x, y, w, h });
+
+  it('mede até a borda do móvel e exige o móvel à frente', () => {
+    const sofa = obj('sofa', 11, 9.5);
+    expect(objetoMaisPerto(ORIGEM, 'right', [sofa])).toMatchObject({ tipo: 'objeto', id: 'sofa', categoria: 'sentar', distancia: 1 });
+    expect(objetoMaisPerto(ORIGEM, 'left', [sofa])).toBeNull();
+  });
+
+  it('colado no móvel vale mesmo olhando para o outro lado', () => {
+    expect(objetoMaisPerto({ x: 10.8, y: 10 }, 'left', [obj('sofa', 11, 9.5)])?.id).toBe('sofa');
+  });
+
+  it('além de um tile: null; empate vai para o menor id', () => {
+    expect(objetoMaisPerto(ORIGEM, 'right', [obj('longe', 12.5, 9.5)])).toBeNull();
+    expect(objetoMaisPerto(ORIGEM, 'right', [obj('b', 11, 9.5), obj('a', 11, 9.5)])?.id).toBe('a');
+  });
+});
+
+describe('móveis do prédio', () => {
+  it('o lounge tem fliperama e mesa de pingue-pongue interagíveis, com id estável e único', () => {
+    const { sim } = escritorio();
+    const todos = objetosDoPredio(sim.building);
+    expect(todos.some((o) => o.categoria === 'fliperama')).toBe(true);
+    expect(todos.some((o) => o.categoria === 'pingpong')).toBe(true);
+    expect(new Set(todos.map((o) => o.id)).size).toBe(todos.length);
+    expect(objetosDoPredio(sim.building)).toBe(todos); // cache por prédio
+  });
+
+  it('o jogador perto do fliperama, olhando para ele, tem o fliperama como alvo', () => {
+    const { sim, clock } = escritorio();
+    sim.setVisitor(visitorInfo(ME, clock.now), clock.now);
+    run(sim, clock, 10, () => !sim.visitorBusy);
+    const f = objetosDoPredio(sim.building).find((o) => o.categoria === 'fliperama')!;
+    const v = sim.visitor!;
+    v.x = (f.x + f.w / 2) * TILE;
+    v.y = (f.y + f.h + 0.3) * TILE;
+    v.dir = 'up';
+    const a = alvoDoJogador(sim);
+    expect(a).toMatchObject({ tipo: 'objeto', id: f.id, categoria: 'fliperama' });
+    expect(posicaoDoAlvo(sim, a!)).not.toBeNull();
   });
 });
