@@ -149,3 +149,5 @@
 - [ ] **Step 2 (NÃO FEITO no navegador; cobertura só por HTTP e testes de modelo):** No navegador: abrir o menu do agente ocioso, desafiar, jogar uma partida inteira pelo teclado e pelo mouse, conferir saldo, humor e extrato; recarregar no meio da partida e conferir que ela retoma; tentar jogar com a equipe e com agente ocupado.
 - [x] **Step 3 (README e CHANGELOG):** Escrever a seção do README e declarar o que não foi visto.
 - [x] **Step 4:** `npm run check` e `npm run build` verdes. **Commit** `docs(jogos): README com regras, rotas e arquivos`.
+
+> Pendências deste projeto e o recurso "equipe na barra" seguem em [`2026-10-22-equipe-na-barra.md`](2026-10-22-equipe-na-barra.md) (projeto 4b, mesma branch).

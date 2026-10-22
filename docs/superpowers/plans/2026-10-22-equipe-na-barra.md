@@ -17,15 +17,15 @@
 ## Tarefas
 
 ### Task 1: Personagens no servidor
-- [ ] Testes e `server/core/personagens.mjs` (`listarEquipe`, `salvarPersonagem`, `limparPersonagem`, validação das peças, ids hostis).
-- [ ] Rotas `GET /api/equipe` e `POST /api/equipe/:nome/personagem` (corpo `{seed, look, parts}` ou `{reset:true}`), PHONE_WRITES, AUDITED e testes de acesso/auditoria e HTTP. Commit.
+- [x] Testes e `server/core/personagens.mjs` (`listarEquipe`, `salvarPersonagem`, `limparPersonagem`, validação das peças, ids hostis).
+- [x] Rotas `GET /api/equipe` e `POST /api/equipe/:nome/personagem` (corpo `{seed, look, parts}` ou `{reset:true}`), PHONE_WRITES, AUDITED e testes de acesso/auditoria e HTTP. Commit.
 
 ### Task 2: Barra e editor no cliente
-- [ ] Modelo puro (`equipe-model.ts`) com testes: quem pode editar quem, ordem da lista, rótulo.
-- [ ] `equipe.ts`: faixa de avatares na barra (`topbar.ts`) e editor (reaproveita `AppearanceFields`); dono com a skin JMAL. CSS no sistema néon. Commit.
+- [x] Modelo puro (`equipe-model.ts`) com testes: quem pode editar quem, ordem da lista, rótulo.
+- [x] `equipe.ts`: faixa de avatares na barra (`topbar.ts`) e editor (reaproveita `AppearanceFields`); dono com a skin JMAL. CSS no sistema néon. Commit.
 
 ### Task 3: Pendências do projeto 4
-- [ ] 409 de agente ocupado via HTTP (reproduzir agente ocupado no servidor de teste).
-- [ ] Etiqueta de humor no mapa (ao lado do nome do agente).
-- [ ] Teste no navegador: painel de jogos (teclas 1/2/3, recarregar no meio da partida, `prefers-reduced-motion`) e a barra da equipe.
-- [ ] README e CHANGELOG (Não lançado).
+- [x] 409 de agente ocupado via HTTP (reproduzir agente ocupado no servidor de teste).
+- [x] Etiqueta de humor ao lado do nome (barra lateral e gaveta); no mapa não, porque o nome do agente não é desenhado no mapa.
+- [x] Teste no navegador (Chrome headless via playwright-core; a extensão do Chrome não estava conectada): barra da equipe e editor, painel de jogos com teclas, retomada ao recarregar e `prefers-reduced-motion`. Não visto: o boneco andando até o agente e abrindo o menu com E (o painel foi aberto por um gancho temporário, já removido); a etiqueta de humor com valor animado ou chateado.
+- [x] README e CHANGELOG (Não lançado).
