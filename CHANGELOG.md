@@ -16,3 +16,7 @@
 - Humor no mapa: emoji (😄 ou 😞) sobre a cabeça do agente, só quando o humor não é neutro.
 - Textos de jogos, equipe na barra e humor traduzidos (en, es, fr) e `npm run i18n:check` na raiz.
 - Rotas `GET /api/carteira`, `POST /api/jogos/desafio`, `POST /api/jogos/:id/jogada` e `GET /api/jogos/:id`, com acesso por pessoa e auditoria com o nome.
+
+### Corrigido
+
+- "Desafiar para um jogo" no menu do mapa falhava porque o menu manda o id do snapshot (`escritorio:<id>`) e o servidor só conhecia o id puro; agora aceita os dois.
