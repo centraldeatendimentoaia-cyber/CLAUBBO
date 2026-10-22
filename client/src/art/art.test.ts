@@ -472,6 +472,18 @@ describe('móveis', () => {
     expect(scr?.h).toBe(9);
   });
 
+  it('fliperama: tela de 10x7 dentro do sprite, cabe em um tile mais as margens e âncora no pé do gabinete', () => {
+    const base = renderFurniture('arcade').base;
+    const scr = base.rects?.screen;
+    expect(scr).toMatchObject({ w: 10, h: 7 });
+    expect(scr!.x + scr!.w).toBeLessThanOrEqual(base.buf.w);
+    expect(scr!.y + scr!.h).toBeLessThanOrEqual(base.buf.h);
+    expect(base.buf.w).toBeLessThanOrEqual(TILE + 2);
+    expect(Math.abs(base.ax - base.buf.w / 2)).toBeLessThanOrEqual(1);
+    expect(base.ay).toBeLessThanOrEqual(base.buf.h);
+    expect(FURNITURE.arcade.footprint).toEqual({ w: 1, h: 1 });
+  });
+
   it('assentos com encosto ao sul têm sprite `front`', () => {
     expect(renderFurniture('office_chair').front).toBeDefined();
     expect(renderFurniture('cafe_chair', 'up').front).toBeDefined();

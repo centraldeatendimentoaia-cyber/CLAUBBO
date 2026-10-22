@@ -567,33 +567,65 @@ export function arcade(): BufFurniture {
   const s = floorSheet(1, 1, 24);
   const b = s.buf;
   const m = ramp('#5b3f9a', 0.07);
+  const side = ramp('#3a2766', 0.06);
+  // Corpo do gabinete: face roxa, lateral esquerda iluminada e base escura.
   frontFace(b, 1, -20, 14, 36, m);
   b.vline(1, -20, 15, m.lt);
-  // Letreiro aceso.
-  b.rect(1, -22, 14, 4, '#f2c14e');
+  b.vline(14, -20, 15, side.base);
+  b.rect(1, 13, 14, 3, side.dd);
+  b.hline(1, 14, 13, side.base);
+  // Letreiro aceso: faixa amarela com moeda e duas estrelas.
+  b.rect(1, -22, 14, 5, '#2b1b4d');
   b.hline(1, 14, -22, '#fff2b0');
-  for (const x of [3, 5, 8, 10, 12]) b.set(x, -20, '#e05a5a');
-  // Tela.
+  b.rect(2, -21, 12, 3, '#f2c14e');
+  b.hline(2, 13, -21, '#ffe58a');
+  b.rect(7, -21, 2, 3, '#e8892f');
+  for (const x of [3, 11]) {
+    b.set(x, -20, '#e05a5a');
+    b.set(x - 1, -20, '#fff2b0');
+    b.set(x + 1, -20, '#fff2b0');
+    b.set(x, -21, '#fff2b0');
+    b.set(x, -19, '#fff2b0');
+  }
+  // Moldura da tela e vidro (a região screen é a que o mundo repinta na partida).
   b.rect(2, -17, 12, 9, '#1a1f2e');
+  b.hline(2, 13, -17, side.base);
   const screen = { x: 3, y: -16, w: 10, h: 7 };
   b.rect(screen.x, screen.y, screen.w, screen.h, '#14213d');
   b.rect(5, -13, 2, 2, '#7be08a');
   b.rect(9, -15, 2, 1, '#ff79c6');
   b.set(8, -11, '#f2c14e');
-  // Painel de controle inclinado.
-  b.rect(1, -7, 14, 4, m.hi);
-  b.hline(1, 14, -4, m.dk);
-  b.rect(4, -7, 2, 2, '#e05a5a');
-  b.set(4, -7, '#ff9a9a');
-  b.vline(5, -5, -4, '#2a2e38');
-  for (const [x, c] of [[9, '#3f7fd8'], [11, '#f2c14e'], [13, '#4cae6a']] as const) b.set(x, -6, c);
-  // Porta de fichas.
-  b.rect(5, 2, 6, 6, m.dd);
-  b.set(6, 4, '#f2a03d');
-  b.set(9, 4, '#f2a03d');
-  // Arte lateral.
-  b.line(2, 13, 6, 9, '#e47aa8');
-  b.line(3, 13, 7, 9, '#36b0b0');
+  b.set(3, -16, '#2c4a7c');
+  b.set(4, -16, '#2c4a7c');
+  b.set(3, -15, '#2c4a7c');
+  // Painel de controle: tampo claro, frente escura, joystick (haste e bola) e três botões.
+  b.rect(0, -7, 16, 4, m.hi);
+  b.hline(0, 15, -7, mix(m.hi, '#ffffff', 0.35));
+  b.rect(0, -3, 16, 1, m.dk);
+  b.hline(0, 15, -2, side.dd);
+  b.ellipse(5.5, -4.5, 2, 1, '#1d1830');
+  b.vline(5, -6, -4, '#c9ced6');
+  b.rect(4, -8, 3, 2, '#e05a5a');
+  b.set(4, -8, '#ff9a9a');
+  b.set(6, -7, '#a03a3a');
+  for (const [x, c] of [[9, '#3f7fd8'], [11, '#f2c14e'], [13, '#4cae6a']] as const) {
+    b.rect(x, -6, 2, 2, c);
+    b.set(x, -6, mix(c, '#ffffff', 0.5));
+  }
+  // Faixas de néon nas bordas da frente.
+  for (let y = -1; y <= 11; y++) {
+    b.set(2, y, y % 3 === 0 ? '#ffd0e6' : '#e47aa8');
+    b.set(13, y, y % 3 === 0 ? '#c8fffa' : '#36b0b0');
+  }
+  // Porta de fichas: placa escura, duas ranhuras acesas e retorno.
+  b.rect(5, 1, 6, 9, '#1d1830');
+  b.hline(5, 10, 1, side.lt);
+  b.rect(6, 2, 4, 2, '#f2a03d');
+  b.hline(6, 9, 2, '#ffe0a0');
+  b.rect(7, 5, 2, 2, '#0e0a1c');
+  b.hline(7, 8, 5, '#8b84a8');
+  b.rect(6, 8, 4, 1, '#0e0a1c');
+  b.hline(6, 9, 9, '#3b3358');
   b.outline();
   contact(b, 0, 13, 16, 4, 0.26);
   s.rects = { screen: rectAt(s, screen.x, screen.y, screen.w, screen.h) };
