@@ -74,7 +74,7 @@ O dono e a equipe cadastrada desafiam um agente ocioso para Pedra, Papel e Tesou
 
 ## Equipe na barra
 
-Na barra superior, ao lado da marca, cada pessoa (o dono e quem está em `data/equipe.json`) aparece como um avatar. O dono usa sempre a skin JMAL (rubi, dourado e coroa), decidida pelo servidor, nunca pelo pedido. Clique no avatar para editar o personagem (peças, cores e "Sortear"; "Voltar ao sorteio" desfaz): cada pessoa edita só o próprio e o dono edita qualquer um; avatar sem permissão fica só para consulta. O personagem fica em `data/personagens.json`. Rotas (só a página; agente e token sem nome recebem 403): `GET /api/equipe` e `POST /api/equipe/<nome>/personagem` com `{seed, look, parts}` ou `{reset: true}`; a gravação entra na auditoria com o nome. Em telas estreitas (até 720 px) a faixa fica escondida.
+Na barra superior, ao lado da marca, cada pessoa (o dono e quem está em `data/equipe.json`) aparece como um avatar. O dono usa a skin JMAL (rubi, dourado e coroa) como visual de partida, na barra e na prévia do editor; a fantasia é decidida pelo servidor, nunca pelo pedido, e o dono pode editar as peças dele (pele, cabelo, barba, olhos, roupa, acessório) por cima dela. "Voltar ao padrão" devolve ao JMAL original. Clique no avatar para editar o personagem (peças, cores e "Sortear"; "Voltar ao sorteio" desfaz): cada pessoa edita só o próprio e o dono edita qualquer um; avatar sem permissão fica só para consulta. O personagem fica em `data/personagens.json`. Rotas (só a página; agente e token sem nome recebem 403): `GET /api/equipe` e `POST /api/equipe/<nome>/personagem` com `{seed, look, parts}` ou `{reset: true}`; a gravação entra na auditoria com o nome. Em telas estreitas (até 720 px) a faixa fica escondida.
 
 ## Boneco e auras
 
