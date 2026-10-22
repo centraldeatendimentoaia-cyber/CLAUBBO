@@ -10,4 +10,6 @@
 - Equipe na barra superior: um avatar por pessoa (o dono com a skin JMAL), com editor de personagem; a pessoa edita o próprio e o dono edita qualquer um. Rotas `GET /api/equipe` e `POST /api/equipe/<nome>/personagem`, com auditoria.
 - O dono pode editar o próprio personagem (JMAL): a fantasia rubi, dourado e coroa aparece na barra e na prévia do editor, as peças escolhidas valem por cima dela e "Voltar ao padrão" volta ao JMAL original.
 - Etiqueta de humor (animado ou chateado) ao lado do nome do agente na barra lateral e na gaveta.
+- Humor no mapa: emoji (😄 ou 😞) sobre a cabeça do agente, só quando o humor não é neutro.
+- Textos de jogos, equipe na barra e humor traduzidos (en, es, fr) e `npm run i18n:check` na raiz.
 - Rotas `GET /api/carteira`, `POST /api/jogos/desafio`, `POST /api/jogos/:id/jogada` e `GET /api/jogos/:id`, com acesso por pessoa e auditoria com o nome.

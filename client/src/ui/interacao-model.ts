@@ -1,6 +1,7 @@
 // Modelo puro do menu de interação do boneco (sem DOM): quais ações existem para um agente ou para o elevador, quais
 // estão apagadas e por quê. Quem decide de verdade é o servidor (papel, 409); aqui só se explica ao jogador.
 import type { AppearanceParts } from '../../../shared/appearance';
+import { tr } from '../../../shared/i18n';
 import { ESCADAS_AURA } from '../world/render/aura';
 
 /** A menor aposta do jogo (o servidor aceita 5, 10 e 25). */
@@ -58,8 +59,8 @@ export function menuDoAgente(a: AgenteMenu): ItemMenu[] {
     return { acao, rotulo: `${nome} ${subir ? '▲' : '▼'} ${a.model} → ${destino}`, atalho, habilitado: true };
   };
   const semMoedas = typeof a.saldoPessoa === 'number' && a.saldoPessoa < APOSTA_MINIMA;
-  const motivoDesafio = !a.ocioso ? 'só agente ocioso' : semMoedas ? 'sem moedas' : undefined;
-  const desafio: ItemMenu = { acao: 'desafiar', rotulo: 'Desafiar para um jogo', atalho: '2', habilitado: !motivoDesafio, ...(motivoDesafio ? { motivo: motivoDesafio } : {}) };
+  const motivoDesafio = !a.ocioso ? tr('só agente ocioso') : semMoedas ? tr('sem moedas') : undefined;
+  const desafio: ItemMenu = { acao: 'desafiar', rotulo: tr('Desafiar para um jogo'), atalho: '2', habilitado: !motivoDesafio, ...(motivoDesafio ? { motivo: motivoDesafio } : {}) };
   return [
     { acao: 'conversar', rotulo: 'Conversar / dar tarefa', atalho: '1', habilitado: true },
     desafio,

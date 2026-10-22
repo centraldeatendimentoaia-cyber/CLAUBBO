@@ -8,6 +8,7 @@ import { changedParts } from './character-model';
 import type { UiComponent, UiContext } from './context';
 import { createAvatar } from './avatar';
 import { h } from './dom';
+import { tr } from '../../../shared/i18n';
 import { descricaoPessoa, fonteAvatar, mensagemDaFalha, podeEditarPessoa, type Pessoa } from './equipe-model';
 
 const novaSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -19,7 +20,7 @@ export class EquipeBar implements UiComponent {
   private pedido = false;
 
   constructor(private readonly ctx: UiContext) {
-    this.el = h('div', { class: 'ui-equipe', role: 'group', attrs: { 'aria-label': 'Equipe' }, hidden: true });
+    this.el = h('div', { class: 'ui-equipe', role: 'group', attrs: { 'aria-label': tr('Equipe') }, hidden: true });
     globalThis.addEventListener?.('focus', () => void this.atualizar()); // sem window (testes) não há o que ouvir
   }
 
@@ -45,8 +46,8 @@ export class EquipeBar implements UiComponent {
       const pode = podeEditarPessoa(eu, p);
       const desc = descricaoPessoa(p, d.eu);
       return h('button', {
-        class: `ui-equipe__pessoa${p.costume ? ' is-dono' : ''}`, type: 'button', title: pode ? `${desc}: editar personagem` : desc,
-        attrs: { 'aria-label': pode ? `${desc}: editar personagem` : desc, 'aria-disabled': pode ? undefined : 'true' },
+        class: `ui-equipe__pessoa${p.costume ? ' is-dono' : ''}`, type: 'button', title: pode ? tr('{0}: editar personagem', [desc]) : desc,
+        attrs: { 'aria-label': pode ? tr('{0}: editar personagem', [desc]) : desc, 'aria-disabled': pode ? undefined : 'true' },
         on: { click: (ev) => (pode ? this.abrirEditor(p, ev.currentTarget as HTMLElement) : undefined) },
       }, createAvatar(fonteAvatar(p), 'sm'));
     }));
@@ -74,17 +75,17 @@ export class EquipeBar implements UiComponent {
       this.ctx.announce(ok);
       await this.atualizar();
     };
-    const salvar = h('button', { class: 'ui-btn ui-btn--primary', type: 'button', text: 'Salvar', on: { click: () => {
+    const salvar = h('button', { class: 'ui-btn ui-btn--primary', type: 'button', text: tr('Salvar'), on: { click: () => {
       const draft = fields.value;
-      if (draft) void gravar({ seed, look: p.look, parts: changedParts(base, draft) }, `Personagem salvo: ${p.rotulo}.`);
+      if (draft) void gravar({ seed, look: p.look, parts: changedParts(base, draft) }, tr('Personagem salvo: {0}.', [p.rotulo]));
     } } });
-    const painel = h('section', { class: 'ui-char ui-equipe-editor', role: 'dialog', attrs: { 'aria-modal': 'true', 'aria-label': `Editar personagem de ${p.rotulo}` }, on: { keydown: (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); fechar(); } } } },
+    const painel = h('section', { class: 'ui-char ui-equipe-editor', role: 'dialog', attrs: { 'aria-modal': 'true', 'aria-label': tr('Editar personagem de {0}', [p.rotulo]) }, on: { keydown: (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); fechar(); } } } },
       h('p', { class: 'ui-equipe-editor__titulo', text: p.rotulo }),
-      h('div', { class: 'ui-char__top' }, fields.preview, h('div', { class: 'ui-char__head' }, h('button', { class: 'ui-btn ui-btn--sm', type: 'button', text: 'Sortear', title: 'Sortear outra aparência (desfaz as peças escolhidas)', on: { click: () => { seed = novaSeed(); base = appearanceFromSeed(seed, { look: p.look }); fields.set({ ...base }); } } }))),
-      p.costume ? h('p', { class: 'ui-muted ui-small', text: 'A fantasia JMAL (rubi, dourado e coroa) é o visual de partida do dono; as peças escolhidas valem por cima dela.' }) : null,
+      h('div', { class: 'ui-char__top' }, fields.preview, h('div', { class: 'ui-char__head' }, h('button', { class: 'ui-btn ui-btn--sm', type: 'button', text: tr('Sortear'), title: tr('Sortear outra aparência (desfaz as peças escolhidas)'), on: { click: () => { seed = novaSeed(); base = appearanceFromSeed(seed, { look: p.look }); fields.set({ ...base }); } } }))),
+      p.costume ? h('p', { class: 'ui-muted ui-small', text: tr('A fantasia JMAL (rubi, dourado e coroa) é o visual de partida do dono; as peças escolhidas valem por cima dela.') }) : null,
       fields.groups, aviso,
-      h('div', { class: 'ui-char__actions' }, salvar, h('button', { class: 'ui-btn', type: 'button', text: 'Cancelar', on: { click: fechar } }),
-        p.custom ? h('button', { class: 'ui-link-btn ui-char__reset', type: 'button', text: p.costume ? 'Voltar ao padrão' : 'Voltar ao sorteio', on: { click: () => void gravar({ reset: true }, p.costume ? 'O personagem voltou ao padrão JMAL.' : 'O personagem voltou ao sorteio.') } }) : null),
+      h('div', { class: 'ui-char__actions' }, salvar, h('button', { class: 'ui-btn', type: 'button', text: tr('Cancelar'), on: { click: fechar } }),
+        p.custom ? h('button', { class: 'ui-link-btn ui-char__reset', type: 'button', text: p.costume ? tr('Voltar ao padrão') : tr('Voltar ao sorteio'), on: { click: () => void gravar({ reset: true }, p.costume ? tr('O personagem voltou ao padrão JMAL.') : tr('O personagem voltou ao sorteio.')) } }) : null),
     );
     this.aberto = painel;
     document.body.append(painel);

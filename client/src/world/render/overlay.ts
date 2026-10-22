@@ -5,6 +5,7 @@
 // Os itens são POSICIONADOS em ordem decrescente de prioridade (quem chega depois desvia, vira
 // só o ícone ou é descartado) e DESENHADOS em ordem crescente (o mais importante fica por cima).
 import { TILE } from '../../art/api';
+import { iconeDeHumor } from './humor-icone';
 import type { WorldOptions } from '../api';
 import type { Camera } from '../camera';
 import { COL_W, CORRIDOR_Y, SOUTH_Y } from '../constants';
@@ -323,6 +324,17 @@ export class Overlay {
       const hx = this.sx(head.x);
       const hy = this.sy(head.y);
       if (hx < -120 || hx > vw + 120 || hy < -60 || hy > vh + 80) continue;
+      const humorIcone = iconeDeHumor(ch.info.humor);
+      if (humorIcone) {
+        // só o emoji, parado, logo acima da cabeça; balões e etiquetas desenham por cima quando existem
+        const size = Math.round(Math.max(10, Math.min(18, 7 * zoom)));
+        ctx.save();
+        ctx.font = `${size}px system-ui, 'Segoe UI Emoji', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(humorIcone, hx, hy - 2);
+        ctx.restore();
+      }
       const selected = sel.agent === ch.id;
       const hovered = sel.hover === ch.id;
       // o visitante (cena Visita) sempre com o nome e o crachá
