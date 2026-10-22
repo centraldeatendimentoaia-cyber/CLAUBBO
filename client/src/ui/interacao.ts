@@ -13,6 +13,7 @@ import { h } from './dom';
 import { abrirJogo } from './jogo';
 import { tr } from '../../../shared/i18n';
 import { humorRotulo, textoHumor } from './jogo-model';
+import { dicaDoObjeto, menuDoObjeto, MOTIVO_SEM_PARCEIRO, textoDoRelogio, usoDe } from './objetos-model';
 import { aparenciaDoJogador, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
 
 const BTW_MAX = 500;
@@ -152,11 +153,12 @@ export class Interacao {
       return;
     }
     const nome = alvo.tipo === 'agente' ? this.ctx.agent(alvo.id)?.name : null;
+    const objeto = alvo.tipo === 'objeto' && alvo.categoria;
     if (alvo.tipo === 'agente' && !nome) {
       this.dica.hidden = true;
       return;
     }
-    const texto = alvo.tipo === 'agente' ? `E · Conversar com ${nome}` : 'E · Usar o elevador';
+    const texto = objeto ? dicaDoObjeto(objeto) : alvo.tipo === 'agente' ? `E · Conversar com ${nome}` : 'E · Usar o elevador';
     if (this.dica.textContent !== texto) this.dica.textContent = texto;
     this.dica.style.left = `${Math.round(pos.x)}px`;
     this.dica.style.top = `${Math.round(pos.y)}px`;
@@ -166,13 +168,19 @@ export class Interacao {
   // ---------------------------------------------------------------- teclado
 
   private teclaAbrir(e: KeyboardEvent): void {
-    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'e' || this.painel || !this.ligado || this.naCidade()) return;
-    if (alvoDigitando(e.target) || document.querySelector('dialog[open], :not(dialog)[aria-modal="true"]')) return;
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'e' || alvoDigitando(e.target)) return;
+    if (this.acionar()) e.preventDefault();
+  }
+
+  /** O que o E faz: abre o menu do alvo à frente do boneco. Também é o botão de interagir da tela de toque. false se não havia nada a abrir. */
+  acionar(): boolean {
+    if (this.painel || !this.ligado || this.naCidade()) return false;
+    if (document.querySelector('dialog[open], :not(dialog)[aria-modal="true"]')) return false;
     const alvo = this.player.alvo();
     const pos = alvo && this.player.alvoNaTela();
-    if (!alvo || !pos) return; // sem alvo à vista, o E não faz nada
-    e.preventDefault();
+    if (!alvo || !pos) return false; // sem alvo à vista, o E não faz nada
     this.abrir(alvo, pos);
+    return true;
   }
 
   /** Com o painel aberto, o teclado é todo dele: o resto do app não vê a tecla (o comportamento padrão do navegador continua). */
@@ -265,9 +273,15 @@ export class Interacao {
     if (a.tipo === 'agente') {
       const ag = this.ctx.agent(a.id);
       if (!ag) return [];
-      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null, saldoPessoa: this.saldo });
+      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', terminal: !a.id.startsWith('escritorio:'), obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null, saldoPessoa: this.saldo });
     }
+    if (a.tipo === 'objeto' && a.categoria) return menuDoObjeto(a.categoria, this.ociosos());
     return menuDoElevador(this.andares(), getFloor());
+  }
+
+  /** Agentes do Escritório parados e livres para um jogo (os de terminal não jogam). */
+  private ociosos(): { id: string; name: string }[] {
+    return (this.ctx.store.snapshot?.agents ?? []).filter((x) => x.id.startsWith('escritorio:') && x.status === 'idle').map((x) => ({ id: x.id, name: x.name }));
   }
 
   /** Os andares do prédio: um por sala, mais sempre o 1 e o 2 (terminais). O cliente não tem dado de quais andares têm elevador: todos entram como `temElevador` e `irParaAndar` é quem recusa. */
@@ -286,6 +300,10 @@ export class Interacao {
     if (item.acao === 'andar') {
       if (item.andar !== undefined && this.player.irParaAndar(item.andar)) this.fechar();
       else this.texto('Elevador', 'O elevador não pode levar você agora. Fique perto da porta e tente de novo.');
+      return;
+    }
+    if (a.tipo === 'objeto') {
+      this.escolherObjeto(item, a);
       return;
     }
     const ag = this.ctx.agent(a.id);
@@ -318,6 +336,18 @@ export class Interacao {
       case 'descer':
         if (ag.model) void this.trocar(a.id, 'descer', ag.model);
         break;
+    }
+  }
+
+  private escolherObjeto(item: ItemMenu, a: Alvo): void {
+    if (item.acao === 'jogar' && item.agenteId) {
+      const ag = this.ctx.agent(item.agenteId);
+      if (!ag) return;
+      this.fechar();
+      abrirJogo({ agente: { id: ag.id, name: ag.name, humor: ag.humor }, aoFechar: () => this.ctx.invalidate() });
+    } else if (a.categoria) {
+      const uso = usoDe(a.categoria);
+      this.texto(uso.titulo, a.categoria === 'relogio' ? textoDoRelogio(new Date()) : uso.texto);
     }
   }
 
@@ -393,7 +423,7 @@ export class Interacao {
     const a = this.alvo;
     if (!p || !a) return;
     const ag = a.tipo === 'agente' ? this.ctx.agent(a.id) : undefined;
-    const titulo = a.tipo === 'agente' ? `${ag?.name ?? ''}${ag?.model ? ` · ${ag.model}` : ''}` : 'Elevador (E)';
+    const titulo = a.tipo === 'agente' ? `${ag?.name ?? ''}${ag?.model ? ` · ${ag.model}` : ''}` : a.tipo === 'objeto' && a.categoria ? usoDe(a.categoria).titulo : 'Elevador (E)';
     const v = this.vista;
     p.replaceChildren();
     p.removeAttribute('role');
@@ -407,7 +437,7 @@ export class Interacao {
         const humor = humorRotulo(ag.humor);
         p.append(h('p', { class: 'int-humor', text: tr('Humor: {0} {1}', [humor.icone, textoHumor(humor.palavra)]) }));
       }
-      if (!itens.length) p.append(h('p', { class: 'int-texto', text: MENSAGEM_SEM_ELEVADOR }));
+      if (!itens.length) p.append(h('p', { class: 'int-texto', text: a.tipo === 'objeto' ? MOTIVO_SEM_PARCEIRO() : MENSAGEM_SEM_ELEVADOR }));
       const lista = h('div', { role: 'menu', attrs: { 'aria-label': titulo } });
       itens.forEach((it, i) => {
         const botao = h(
@@ -458,7 +488,7 @@ export class Interacao {
 }
 
 /** Liga o menu de interação se o mundo tem boneco (não existe na cena Visita). Chamado por ui/index.ts. */
-export function criarInteracao(ctx: UiContext, naCidade: () => boolean, disponivel: () => boolean): Interacao | null {
+export function criarInteracao(ctx: UiContext, naCidade: () => boolean, disponivel: () => boolean): { interacao: Interacao; player: PlayerWorld } | null {
   const player = (ctx.world as { player?: PlayerWorld }).player;
-  return player ? new Interacao(ctx, player, naCidade, disponivel) : null;
+  return player ? { interacao: new Interacao(ctx, player, naCidade, disponivel), player } : null;
 }

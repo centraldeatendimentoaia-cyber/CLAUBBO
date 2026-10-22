@@ -120,6 +120,17 @@ describe('modo celular', () => {
       expect(phoneGate(req('PUT', c), url('/api/jogos/desafio'), TOKEN, 4530, team).action).toBe('deny');
     });
 
+    it('presença: equipe e dono passam só em POST /api/presenca e /api/presenca/sair; o resto não é escrita do celular', () => {
+      const c = `v2_cel_4530=${ANA}`;
+      expect(phoneGate(req('POST', c), url('/api/presenca'), TOKEN, 4530, team).action).toBe('allow');
+      expect(phoneGate(req('POST', c), url('/api/presenca/sair'), TOKEN, 4530, team).action).toBe('allow');
+      expect(phoneGate(req('POST', `v2_cel_4530=${TOKEN}`), url('/api/presenca'), TOKEN, 4530, team).action).toBe('allow');
+      expect(phoneGate(req('POST', `v2_cel_4530=${'b'.repeat(64)}`), url('/api/presenca'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+      expect(phoneGate(req('POST', ''), url('/api/presenca'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
+      for (const p of ['/api/presenca/x', '/api/presenca/../sair', '/api/presenca/sair/x']) expect(PHONE_WRITES.test(p)).toBe(false);
+      expect(phoneGate(req('PUT', c), url('/api/presenca'), TOKEN, 4530, team).action).toBe('deny');
+    });
+
     it('equipe: passa só POST /api/equipe/<nome>/personagem; GET, PUT e variantes com barra não são escrita do celular', () => {
       const c = `v2_cel_4530=${ANA}`;
       expect(phoneGate(req('POST', c), url('/api/equipe/Ana/personagem'), TOKEN, 4530, team).action).toBe('allow');

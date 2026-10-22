@@ -4,7 +4,8 @@ import type { AgentInfo, OfficeSnapshot, RoomInfo } from '../../../shared/types'
 import type { Appearance, ArtModule, RoomTheme } from '../art/api';
 import { DEFAULT_WORLD_OPTIONS } from './api';
 import { TILE } from './constants';
-import { alvoDoJogador, alvoMaisPerto, posicaoDoAlvo } from './player';
+import { alvoDoJogador, alvoMaisPerto, objetoMaisPerto, posicaoDoAlvo } from './player';
+import { objetosDoPredio, type ObjetoCand } from './objetos';
 import { Sim } from './sim/sim';
 import { VISITOR_ID, visitorInfo } from './sim/visitor';
 
@@ -162,5 +163,92 @@ describe('o jogador dentro do escritório (Sim fora do modo visita)', () => {
     const { sim } = escritorio();
     expect(sim.visitor).toBeNull();
     expect(alvoDoJogador(sim)).toBeNull();
+  });
+});
+
+describe('objetoMaisPerto', () => {
+  const obj = (id: string, x: number, y: number, w = 2, h = 1): ObjetoCand => ({ id, kind: 'sofa', categoria: 'sentar', x, y, w, h });
+
+  it('mede até a borda do móvel e exige o móvel à frente', () => {
+    const sofa = obj('sofa', 11, 9.5);
+    expect(objetoMaisPerto(ORIGEM, 'right', [sofa])).toMatchObject({ tipo: 'objeto', id: 'sofa', categoria: 'sentar', distancia: 1 });
+    expect(objetoMaisPerto(ORIGEM, 'left', [sofa])).toBeNull();
+  });
+
+  it('colado no móvel vale mesmo olhando para o outro lado', () => {
+    expect(objetoMaisPerto({ x: 10.8, y: 10 }, 'left', [obj('sofa', 11, 9.5)])?.id).toBe('sofa');
+  });
+
+  it('além de um tile: null; empate vai para o menor id', () => {
+    expect(objetoMaisPerto(ORIGEM, 'right', [obj('longe', 12.5, 9.5)])).toBeNull();
+    expect(objetoMaisPerto(ORIGEM, 'right', [obj('b', 11, 9.5), obj('a', 11, 9.5)])?.id).toBe('a');
+  });
+});
+
+describe('móveis do prédio', () => {
+  it('o lounge tem fliperama e mesa de pingue-pongue interagíveis, com id estável e único', () => {
+    const { sim } = escritorio();
+    const todos = objetosDoPredio(sim.building);
+    expect(todos.some((o) => o.categoria === 'fliperama')).toBe(true);
+    expect(todos.some((o) => o.categoria === 'pingpong')).toBe(true);
+    expect(new Set(todos.map((o) => o.id)).size).toBe(todos.length);
+    expect(objetosDoPredio(sim.building)).toBe(todos); // cache por prédio
+  });
+
+  it('o jogador perto do fliperama, olhando para ele, tem o fliperama como alvo', () => {
+    const { sim, clock } = escritorio();
+    sim.setVisitor(visitorInfo(ME, clock.now), clock.now);
+    run(sim, clock, 10, () => !sim.visitorBusy);
+    const f = objetosDoPredio(sim.building).find((o) => o.categoria === 'fliperama')!;
+    const v = sim.visitor!;
+    v.x = (f.x + f.w / 2) * TILE;
+    v.y = (f.y + f.h + 0.3) * TILE;
+    v.dir = 'up';
+    const a = alvoDoJogador(sim);
+    expect(a).toMatchObject({ tipo: 'objeto', id: f.id, categoria: 'fliperama' });
+    expect(posicaoDoAlvo(sim, a!)).not.toBeNull();
+  });
+});
+
+describe('presença: convidados na simulação', () => {
+  const ANA = { name: 'Ana', look: 'f' as const };
+
+  it('aparece no ponto avisado, anda até o novo ponto e some ao ser removido; entra em people() e person()', () => {
+    const { sim, clock } = escritorio();
+    const id = 'convidado:ana';
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 10, 10, 'down');
+    const g = sim.guests.get(id)!;
+    expect(g).toBeDefined();
+    expect([g.x, g.y]).toEqual([10 * TILE, 10 * TILE]);
+    expect([...sim.people()]).toContain(g);
+    expect(sim.person(id)).toBe(g);
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 13, 10, 'up');
+    run(sim, clock, 5);
+    expect(g.x).toBeCloseTo(13 * TILE, 0);
+    expect(g.dir).toBe('up'); // chegou: vira para onde avisou
+    expect(g.pose).toBe('stand');
+    sim.removeGuest(id);
+    expect(sim.guests.size).toBe(0);
+    expect(sim.person(id)).toBeUndefined();
+  });
+
+  it('o convidado não é alvo do jogador (não entra em chars)', () => {
+    const { sim, clock } = escritorio();
+    sim.setVisitor(visitorInfo(ME, clock.now), clock.now);
+    run(sim, clock, 10, () => !sim.visitorBusy);
+    const v = sim.visitor!;
+    sim.setGuest('convidado:ana', visitorInfo(ANA, clock.now, 'convidado:ana'), v.x / TILE + 0.5, v.y / TILE, 'down');
+    v.dir = 'right';
+    expect(alvoDoJogador(sim)?.id).not.toBe('convidado:ana');
+    expect(sim.chars.has('convidado:ana')).toBe(false);
+  });
+
+  it('longe demais (outro canto do mapa) aparece direto no ponto, sem atravessar o prédio', () => {
+    const { sim, clock } = escritorio();
+    const id = 'convidado:ana';
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 5, 5, 'down');
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 40, 20, 'left');
+    run(sim, clock, 0.2);
+    expect(sim.guests.get(id)!.x).toBeCloseTo(40 * TILE, 0);
   });
 });

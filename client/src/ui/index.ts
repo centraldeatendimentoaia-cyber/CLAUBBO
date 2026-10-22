@@ -6,6 +6,8 @@ import { access, onAccessChange } from '../net/access';
 import { CliRequests } from './cli-requests';
 import { setFloor } from '../floor';
 import { criarInteracao } from './interacao';
+import { criarControlesToque } from './controles-toque';
+import { criarPresenca } from './presenca';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/500.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -321,7 +323,9 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   root.append(worldSocial.el);
   components.push(worldSocial);
   // O boneco do jogador e o menu da tecla E (só quando o mundo tem boneco; a cena Visita não tem).
-  criarInteracao(ctx, inCity, () => citySceneAvailable(hw, worldGate(ctx, hw)));
+  const interacao = criarInteracao(ctx, inCity, () => citySceneAvailable(hw, worldGate(ctx, hw)));
+  if (interacao) criarControlesToque(root, ctx.world, interacao.player, interacao.interacao); // direcional e botão E em tela de toque
+  criarPresenca(ctx); // os outros bonecos no mapa e o meu para eles
 
   // ---------------------------------------------------------------- renderização agrupada por quadro
   let rafId = 0;

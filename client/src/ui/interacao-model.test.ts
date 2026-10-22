@@ -18,6 +18,11 @@ describe('menuDoAgente', () => {
     expect(d.motivo).toBe('só agente ocioso');
   });
 
+  it('agente de terminal: desafiar apagado com motivo (o jogo é dos agentes do Escritório)', () => {
+    const d = por(menuDoAgente({ ...base, terminal: true }), 'desafiar');
+    expect(d.habilitado).toBe(false);
+    expect(d.motivo).toBe('agente de terminal não joga');
+  });
   it('saldo conhecido abaixo de 5: desafiar apagado com motivo; desconhecido ou >= 5 fica habilitado', () => {
     const d = (saldoPessoa?: number | null) => por(menuDoAgente({ ...base, saldoPessoa }), 'desafiar');
     expect(d(4)).toMatchObject({ habilitado: false, motivo: 'sem moedas' });

@@ -146,6 +146,9 @@ export class Sim {
   readonly visit: boolean;
   /** Visita: o meu personagem (fora de `chars`: nem snapshot, nem vida social, nem lugar reservado). */
   visitor: Character | null = null;
+  /** Presença: as outras pessoas no mapa (id `convidado:<nome>`), fora de `chars` como o visitante; andam até a posição que avisaram. */
+  readonly guests = new Map<string, Character>();
+  private readonly guestTargets = new Map<string, { x: number; y: number; dir: Dir }>();
   /** Visita: para onde o teclado manda o visitante. */
   visitorIntent: VisitorIntent = { ...NO_INTENT };
   /** Visita: as luzes do prédio (aplicadas a cada snapshot e a cada segundo). */
@@ -642,6 +645,7 @@ export class Sim {
       this.runCharacter(ch, dt, now);
     }
     if (this.visitor) this.runVisitor(this.visitor, dt, now);
+    for (const g of this.guests.values()) this.runGuest(g, dt);
     if (!this.visit) {
       const cfg = this.options().pets;
       if (cfg !== this.petsCfg) {
@@ -1851,12 +1855,71 @@ export class Sim {
   /** Os personagens desenhados: os agentes e, na visita, o visitante (por último). */
   *people(): IterableIterator<Character> {
     yield* this.chars.values();
+    yield* this.guests.values();
     if (this.visitor && !this.visitor.gone) yield this.visitor;
   }
 
   /** Um personagem desenhado pelo id (agente ou o visitante). */
   person(id: string): Character | undefined {
-    return this.chars.get(id) ?? (this.visitor?.id === id ? this.visitor : undefined);
+    return this.chars.get(id) ?? this.guests.get(id) ?? (this.visitor?.id === id ? this.visitor : undefined);
+  }
+
+  /**
+   * Presença: mostra (ou atualiza) a pessoa de outra página em (x, y) tiles, olhando para `dir`. Na primeira vez ela aparece no
+   * lugar; depois anda até lá (de longe demais, ou noutro andar antes, ela só aparece no ponto). Aparência ruim: ninguém.
+   */
+  setGuest(id: string, info: AgentInfo, x: number, y: number, dir: Dir): void {
+    this.guestTargets.set(id, { x: x * TILE, y: y * TILE, dir });
+    const g = this.guests.get(id);
+    if (g) {
+      if (g.info.look !== info.look || g.info.name !== info.name || JSON.stringify(g.info.parts) !== JSON.stringify(info.parts)) {
+        this.guests.delete(id); // aparência nova: refaz o boneco
+      } else return;
+    }
+    let appearance;
+    try {
+      appearance = this.art.appearanceFromSeed(info.seed, { look: info.look, sub: false, parts: info.parts });
+    } catch {
+      this.guestTargets.delete(id);
+      return;
+    }
+    const ch = new Character(info, appearance);
+    ch.placeAtTile(Math.floor(x), Math.floor(y));
+    ch.x = x * TILE;
+    ch.y = y * TILE;
+    ch.dir = dir;
+    ch.alpha = 1;
+    this.guests.set(id, ch);
+  }
+
+  removeGuest(id: string): void {
+    this.guests.delete(id);
+    this.guestTargets.delete(id);
+  }
+
+  /** Uma pessoa de outra página anda em linha reta até a posição avisada, na velocidade de corrida (o aviso chega a cada ~200 ms). */
+  private runGuest(g: Character, dt: number): void {
+    g.animT += dt * 1000;
+    const alvo = this.guestTargets.get(g.id);
+    if (!alvo) return;
+    const dx = alvo.x - g.x;
+    const dy = alvo.y - g.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 6 * TILE) {
+      g.x = alvo.x;
+      g.y = alvo.y;
+    } else if (dist > 0.5) {
+      const passo = Math.min(dist, RUN_SPEED * 1.2 * dt);
+      g.x += (dx / dist) * passo;
+      g.y += (dy / dist) * passo;
+      g.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
+    }
+    const andando = Math.hypot(alvo.x - g.x, alvo.y - g.y) > 0.5;
+    if (!andando) g.dir = alvo.dir;
+    const t = tileAt(g.x, g.y);
+    g.tx = t.x;
+    g.ty = t.y;
+    g.setPose(andando ? (dist > 1.5 * TILE ? 'run' : 'walk') : 'stand');
   }
 
   /** Visita: o visitante surge no elevador da recepção e sai para o hall (null = tira o visitante). */

@@ -58,6 +58,7 @@ import { criarBtw } from './core/btw.mjs';
 import { chavePessoa, extratoDe, saldoDe } from './core/carteiras.mjs';
 import { humoresDe } from './core/humor.mjs';
 import { criarJogos } from './core/jogos.mjs';
+import { criarPresenca, podeAparecer } from './core/presenca.mjs';
 import { listarEquipe, salvarPersonagem } from './core/personagens.mjs';
 import { createRoutine, listRoutines, removeRoutine, runNow, setPaused, startScheduler } from './core/routines.mjs';
 
@@ -348,6 +349,13 @@ const btw = criarBtw({ runTurn, getAgent, systemFor, providerReal: (a) => getAcc
 // Ocioso = o mesmo critério do snapshot (sem turno ao vivo nem reunião) mais nenhuma tarefa na fila, rodando ou esperando OK. Síncrono: criarJogos recusa promessas.
 const agenteOcioso = (id) => !live.current(id) && !inMeeting().has(id) && !listTasks().some((t) => t.agent === id && (t.state === 'next' || t.state === 'doing' || t.state === 'waiting'));
 const jogos = criarJogos({ getAgent, agenteOcioso });
+// Presença ao vivo no mapa (só memória). As páginas de dono/equipe recebem a lista pelo /api/stream (evento 'presenca').
+const presenca = criarPresenca();
+const presencaClients = new Map(); // res do stream -> nome de quem abriu (só dono/equipe com nome e sem o token dos agentes)
+const avisarPresenca = () => { const lista = presenca.lista(); for (const c of presencaClients.keys()) send(c, 'presenca', lista); };
+let presencaPendente = null;
+const agendarPresenca = () => { presencaPendente ??= setTimeout(() => { presencaPendente = null; avisarPresenca(); }, 120); presencaPendente.unref?.(); }; // junta várias posições num aviso só
+setInterval(() => { if (presenca.varrer()) agendarPresenca(); }, 2000).unref?.();
 const saveCalls = () => writeJson(CALL_FILE, { grants: callStore.grants, calls: callStore.calls.slice(-50) });
 const granted = (from, to) => callStore.grants.some((g) => g.from === from && g.to === to);
 const callBusy = () => callStore.calls.some((c) => c.state === 'running');
@@ -515,8 +523,18 @@ async function route(req, res, url) {
   let m;
   if (p === '/api/stream') {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-    clients.add(res); req.on('close', () => clients.delete(res));
+    clients.add(res);
+    const quemVe = !req.headers['x-v2-agente'] && podeAparecer(req.pessoa) ? req.pessoa.nome : null;
+    if (quemVe) presencaClients.set(res, quemVe);
+    req.on('close', () => {
+      clients.delete(res);
+      if (!quemVe) return;
+      presencaClients.delete(res);
+      // fechou a última página da pessoa: ela sai do mapa dos outros na hora (senão só pelo prazo)
+      if (![...presencaClients.values()].some((n) => n.toLowerCase() === quemVe.toLowerCase()) && presenca.remover(quemVe)) agendarPresenca();
+    });
     send(res, 'snapshot', state.snapshot); send(res, 'feed', state.feed);
+    if (quemVe) send(res, 'presenca', presenca.lista());
     return;
   }
   if (p === '/api/snapshot') return json(res, 200, state.snapshot);
@@ -827,6 +845,17 @@ ${logs}` : ''}`;
   // Falha inesperada (disco, JSON): o detalhe vai para o log do servidor, nunca para a resposta.
   const comFalha = (res, fn) => { try { return fn(); } catch (e) { console.error('jogos:', e?.stack || e); return json(res, 500, { error: 'falha ao processar o jogo' }); } };
   const quemFez = (req) => ({ who: fromNetwork(req) ? 'celular' : 'pagina', nome: req.pessoa.nome, method: 'POST', status: 200 });
+  if (p === '/api/presenca' && method === 'POST') {
+    if (!soPessoa(res, req)) return;
+    const r = presenca.atualizar(req.pessoa, await readBody(req));
+    if (r.ok) agendarPresenca();
+    return r.ok ? json(res, 200, { ok: true }) : json(res, r.status, { error: r.error });
+  }
+  if (p === '/api/presenca/sair' && method === 'POST') {
+    if (!soPessoa(res, req)) return;
+    if (presenca.remover(req.pessoa.nome)) agendarPresenca();
+    return json(res, 200, { ok: true });
+  }
   if (p === '/api/carteira' && method === 'GET') {
     if (!soPessoa(res, req)) return;
     const quem = chavePessoa(req.pessoa.nome);
@@ -836,7 +865,7 @@ ${logs}` : ''}`;
     if (!soPessoa(res, req)) return;
     const body = await readBody(req);
     return comFalha(res, () => {
-      const r = jogos.desafiar({ pessoa: req.pessoa, agentId: body.agente, aposta: body.aposta });
+      const r = jogos.desafiar({ pessoa: req.pessoa, agentId: typeof body.agente === 'string' ? body.agente.replace(/^escritorio:/, '') : body.agente, aposta: body.aposta }); // o menu do mapa manda o id do snapshot
       if (r.ok) auditRecord(config.data, { ...quemFez(req), path: `/api/jogos/desafio#${r.id}` });
       return respJogo(res, r);
     });

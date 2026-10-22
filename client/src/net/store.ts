@@ -15,6 +15,8 @@ export interface StoreEvents {
   snapshot: OfficeSnapshot;
   feed: FeedItem[];
   notice: Notice;
+  /** Presença ao vivo: a lista crua de pessoas no mapa (quem lê confere a forma; ver ui/presenca-model.ts). Só chega para dono e equipe. */
+  presenca: unknown;
   connection: ConnectionState;
   /** O servidor está servindo outro build do cliente: esta página está desatualizada. Emitido uma vez. */
   update: { build: string; current: string };
@@ -463,6 +465,11 @@ export class OfficeStore {
       if (!current()) return;
       const items = this.parse<FeedItem[]>(ev, 'feed');
       if (items) this.applyFeed(items);
+    });
+    es.addEventListener('presenca', (ev) => {
+      if (!current()) return;
+      const lista = this.parse<unknown>(ev, 'presença');
+      if (lista !== null) this.emit('presenca', lista);
     });
     es.addEventListener('notice', (ev) => {
       if (!current()) return;

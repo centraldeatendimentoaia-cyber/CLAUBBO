@@ -6,6 +6,7 @@ export type Selection = { type: 'agent'; id: string } | { type: 'room'; id: stri
 
 import type { PetsConfig } from './pets/config';
 import type { AgentInfo } from '../../../shared/types';
+import type { Dir } from '../art/api';
 import type { Alvo } from './player';
 import type { VisitorIntent } from './sim/visitor';
 
@@ -170,6 +171,19 @@ export const DEFAULT_WORLD_OPTIONS: WorldOptions = {
  * nada muda. O teclado (setas e WASD, Shift corre) é lido pelo próprio mundo, menos com um campo, menu ou diálogo em
  * foco e no timelapse.
  */
+/** Outra pessoa no mapa (presença ao vivo): quem é, o personagem dela e onde está (x e y em tiles). */
+export interface Convidado {
+  /** Estável por pessoa (`convidado:<nome>`). */
+  id: string;
+  nome: string;
+  look: 'f' | 'm';
+  parts?: AgentInfo['parts'];
+  andar: number;
+  x: number;
+  y: number;
+  dir: Dir;
+}
+
 export interface PlayerWorld {
   /** Liga o boneco (aparência do dono) no elevador do andar 1 e mostra esse andar. */
   ligar(me: { name: string; look: 'f' | 'm'; parts?: AgentInfo['parts'] }): void;
@@ -178,6 +192,10 @@ export interface PlayerWorld {
   setIntent(i: VisitorIntent): void;
   /** O agente ou elevador mais perto, à frente do boneco; null se não há. */
   alvo(): Alvo | null;
+  /** Onde o boneco está: andar e posição em tiles; null sem boneco ou parado no elevador. */
+  posicao(): { andar: number; x: number; y: number; dir: Dir } | null;
+  /** As outras pessoas no mapa agora (a lista inteira, a cada vez): quem some da lista some do mapa. Sem boneco ligado, nada aparece. */
+  convidados(lista: readonly Convidado[]): void;
   /** Onde desenhar a dica do alvo (px CSS), ou null fora da tela. */
   alvoNaTela(): { x: number; y: number } | null;
   /** Com o boneco perto de um elevador: ele entra, e aparece no elevador do andar de destino. false se não pode agora. */
