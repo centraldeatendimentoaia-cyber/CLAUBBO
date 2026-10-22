@@ -10,7 +10,8 @@ import type { PlayerWorld } from '../world/api';
 import type { UiContext } from './context';
 import { h } from './dom';
 import { abrirJogo } from './jogo';
-import { humorRotulo } from './jogo-model';
+import { tr } from '../../../shared/i18n';
+import { humorRotulo, textoHumor } from './jogo-model';
 import { aparenciaDoJogador, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
 
 const BTW_MAX = 500;
@@ -390,7 +391,7 @@ export class Interacao {
       p.append(h('div', { class: 'int-titulo', text: titulo }));
       if (ag) {
         const humor = humorRotulo(ag.humor);
-        p.append(h('p', { class: 'int-humor', text: `Humor: ${humor.icone} ${humor.palavra}` }));
+        p.append(h('p', { class: 'int-humor', text: tr('Humor: {0} {1}', [humor.icone, textoHumor(humor.palavra)]) }));
       }
       if (!itens.length) p.append(h('p', { class: 'int-texto', text: MENSAGEM_SEM_ELEVADOR }));
       const lista = h('div', { role: 'menu', attrs: { 'aria-label': titulo } });

@@ -4,7 +4,7 @@ import type { Activity, AgentInfo, FeedItem, RoomInfo, ShellJob, TaskItem } from
 import { roomTheme } from '../art';
 import { createAvatarPlaceholder, updateAvatar } from './avatar';
 import { CharacterEditor } from './character-editor';
-import { humorEtiqueta } from './jogo-model';
+import { humorEtiqueta, textoHumor } from './jogo-model';
 import { MessageComposer } from './composer';
 import { Conversation } from './conversation';
 import type { UiComponent, UiContext } from './context';
@@ -557,7 +557,7 @@ class AgentView {
     setStyleVar(this.avatar, '--acc', account?.color ?? '#8b98b3');
     setText(this.name, a.name);
     this.name.classList.toggle('is-owner', a.costume === 'jmal');
-  { const hum = humorEtiqueta(a.humor); if (hum) this.name.dataset.humor = hum.palavra; else delete this.name.dataset.humor; this.name.title = hum ? `Humor: ${hum.palavra}` : ''; } // etiqueta ao lado do nome
+  { const hum = humorEtiqueta(a.humor); if (hum) this.name.dataset.humor = hum.palavra; else delete this.name.dataset.humor; this.name.title = hum ? tr('Humor: {0}', [textoHumor(hum.palavra)]) : ''; } // etiqueta ao lado do nome
     this.character.render(a, !!live);
     setText(this.role, roleLabel(a));
     setVariant(this.role, 'ui-role--', a.kind);

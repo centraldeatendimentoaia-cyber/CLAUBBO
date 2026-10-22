@@ -4,7 +4,8 @@
 import { desafiarAgente, jogarGesto, lerPartida, saldoDaCarteira } from '../net/interacao-api';
 import { h, prefersReducedMotion } from './dom';
 import { criarGuarda } from './interacao-model';
-import { apostasPossiveis, GESTOS, humorRotulo, ICONES_GESTO, mensagemDaFalha, resumoRodada, rotuloGesto, textoResultado, type RodadaJogo } from './jogo-model';
+import { tr } from '../../../shared/i18n';
+import { textoHumor, apostasPossiveis, GESTOS, humorRotulo, ICONES_GESTO, mensagemDaFalha, resumoRodada, rotuloGesto, textoResultado, type RodadaJogo } from './jogo-model';
 
 export interface AbrirJogo {
   agente: { id: string; name: string; humor?: string };
@@ -56,7 +57,7 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
   const guarda = criarGuarda();
   const voltaFoco = document.activeElement;
   const vivo = h('p', { class: 'jogo-vivo', role: 'status', attrs: { 'aria-live': 'polite' } });
-  const painel = h('div', { class: 'jogo', role: 'dialog', attrs: { 'aria-modal': 'true', 'aria-label': `Jogo contra ${agente.name}` } });
+  const painel = h('div', { class: 'jogo', role: 'dialog', attrs: { 'aria-modal': 'true', 'aria-label': tr('Jogo contra {0}', [agente.name]) } });
 
   let fase: Fase = 'carregando';
   let saldo: number | null = null;
@@ -118,7 +119,7 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
       if (fechado) return;
       if (r.ok && r.corpo.fim !== true && r.corpo.estado === 'aberta') {
         aplicarPartida(r.corpo);
-        aviso = 'Partida retomada.';
+        aviso = tr('Partida retomada.');
         dizer(aviso);
         desenhar();
         return;
@@ -148,7 +149,7 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
       resultado = undefined;
       fala = '';
       aviso = '';
-      dizer('Partida aberta. Escolha pedra, papel ou tesoura.');
+      dizer(tr('Partida aberta. Escolha pedra, papel ou tesoura.'));
     } else {
       aviso = mensagemDaFalha(r.valor.status, r.valor.erro);
       dizer(aviso);
@@ -170,7 +171,7 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
       const { status, erro } = r.valor;
       if (status === 404 || status === 410) voltarParaAposta(mensagemDaFalha(status, erro));
       else {
-        aviso = status === 409 ? 'A partida mudou; confira o placar e jogue de novo.' : mensagemDaFalha(status, erro);
+        aviso = status === 409 ? tr('A partida mudou; confira o placar e jogue de novo.') : mensagemDaFalha(status, erro);
         if (status === 409) {
           // rodada desatualizada (outra aba, clique duplo): relê o estado em vez de adivinhar
           const lida = await lerPartida(id);
@@ -261,21 +262,21 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
     const ativo = guarda.ativo;
     const hum = humorRotulo(humor);
     painel.replaceChildren(
-      h('div', { class: 'int-titulo', text: `Pedra, papel e tesoura · ${agente.name}` }),
+      h('div', { class: 'int-titulo', text: tr('Pedra, papel e tesoura · {0}', [agente.name]) }),
       h('p', { class: 'jogo-linha' },
-        h('span', { text: `Humor: ${hum.icone} ${hum.palavra}` }),
-        h('span', { text: saldo === null ? 'Saldo indisponível' : `Seu saldo: 🪙 ${saldo}` }),
+        h('span', { text: tr('Humor: {0} {1}', [hum.icone, textoHumor(hum.palavra)]) }),
+        h('span', { text: saldo === null ? tr('Saldo indisponível') : tr('Seu saldo: 🪙 {0}', [saldo]) }),
       ),
     );
     let foco: HTMLButtonElement | null = null;
-    if (fase === 'carregando') painel.append(h('p', { class: 'int-texto', text: 'Carregando…' }));
+    if (fase === 'carregando') painel.append(h('p', { class: 'int-texto', text: tr('Carregando…') }));
 
     if (fase === 'aposta') {
       // o saldo do agente não chega ao cliente: o servidor recusa (422) se ele não puder pagar
       const valores = apostasPossiveis(saldo, null);
-      painel.append(h('p', { class: 'int-texto', text: 'Melhor de 3: vence quem ganhar 2 rodadas. Escolha a aposta; cada lado coloca o mesmo valor.' }));
+      painel.append(h('p', { class: 'int-texto', text: tr('Melhor de 3: vence quem ganhar 2 rodadas. Escolha a aposta; cada lado coloca o mesmo valor.') }));
       const linha = h('div', { class: 'int-acoes' });
-      if (!valores.length) painel.append(h('p', { class: 'int-texto', text: 'Você não tem moedas para a menor aposta (5).' }));
+      if (!valores.length) painel.append(h('p', { class: 'int-texto', text: tr('Você não tem moedas para a menor aposta (5).') }));
       for (const v of valores) {
         const b = btn(`🪙 ${v}`, () => void desafiar(v), 'int-btn--ok', ativo);
         foco ??= b;
@@ -291,10 +292,10 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
         h('p', { class: 'int-texto', text: fase === 'jogando' ? `Rodada ${rodada} · aposta 🪙 ${aposta}` : `Aposta 🪙 ${aposta}` }),
       );
       if (ultima) {
-        const agenteVisto = mostrar ? `${ICONES_GESTO[ultima.gestoAgente as keyof typeof ICONES_GESTO] ?? ''} ${rotuloGesto(ultima.gestoAgente)}` : '❔ escolhendo…';
+        const agenteVisto = mostrar ? `${ICONES_GESTO[ultima.gestoAgente as keyof typeof ICONES_GESTO] ?? ''} ${rotuloGesto(ultima.gestoAgente)}` : `❔ ${tr('escolhendo…')}`;
         painel.append(
           h('div', { class: `jogo-mesa${revelando ? ' is-revelando' : ''}` },
-            h('span', { text: `Você: ${ICONES_GESTO[ultima.gestoPessoa as keyof typeof ICONES_GESTO] ?? ''} ${rotuloGesto(ultima.gestoPessoa)}` }),
+            h('span', { text: `${tr('Você')}: ${ICONES_GESTO[ultima.gestoPessoa as keyof typeof ICONES_GESTO] ?? ''} ${rotuloGesto(ultima.gestoPessoa)}` }),
             h('span', { text: `${agente.name}: ${agenteVisto}` }),
           ),
           ...(mostrar ? [h('p', { class: 'int-texto', text: resumoRodada(ultima) })] : []),
@@ -319,13 +320,13 @@ export function abrirJogo({ agente, aoFechar }: AbrirJogo): (() => void) | null 
         h('p', { class: 'jogo-resultado', text: textoResultado(true, resultado, (saldo ?? 0) - saldoAntes) }),
         h('p', { class: 'int-texto', text: `${agente.name} agora está ${hf.icone} ${hf.palavra}.${fala ? ` “${fala}”` : ''}` }),
       );
-      const outra = btn('Jogar de novo', novaPartida, 'int-btn--ok');
+      const outra = btn(tr('Jogar de novo'), novaPartida, 'int-btn--ok');
       foco ??= outra;
       painel.append(h('div', { class: 'int-acoes' }, outra));
     }
 
     if (aviso) painel.append(h('p', { class: 'int-resp', text: aviso }));
-    painel.append(h('div', { class: 'int-acoes' }, btn('Fechar (Esc)', fechar)), vivo);
+    painel.append(h('div', { class: 'int-acoes' }, btn(tr('Fechar (Esc)'), fechar)), vivo);
     // o foco volta para a ação principal a cada desenho (a tela é refeita inteira)
     (foco ?? (painel.querySelector('button') as HTMLButtonElement | null))?.focus({ preventScroll: true });
   }
