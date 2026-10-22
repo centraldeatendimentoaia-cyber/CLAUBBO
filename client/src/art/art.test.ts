@@ -502,6 +502,22 @@ describe('móveis', () => {
     expect(filled).toBeGreaterThan(24);
   });
 
+  it('ping-pong: duas raquetes e a bolinha sobre o tampo, sem passar da rede', () => {
+    const { buf, ax } = renderFurniture('pingpong_table').base;
+    expect(countColor(buf, '#d64545')).toBeGreaterThanOrEqual(10);
+    expect(countColor(buf, '#6b4a32')).toBe(6);
+    // cada raquete fica de um lado da rede (coluna central)
+    let left = 0;
+    let right = 0;
+    for (let y = 0; y < buf.h; y++) {
+      for (let x = 0; x < buf.w; x++) {
+        const i = (y * buf.w + x) * 4;
+        if (buf.data[i] === 0x6b && buf.data[i + 1] === 0x4a && buf.data[i + 2] === 0x32 && buf.data[i + 3] > 200) (x < ax ? left++ : right++);
+      }
+    }
+    expect([left, right]).toEqual([3, 3]);
+  });
+
   it('fliperama: tela de 10x7 dentro do sprite, cabe em um tile mais as margens e âncora no pé do gabinete', () => {
     const base = renderFurniture('arcade').base;
     const scr = base.rects?.screen;

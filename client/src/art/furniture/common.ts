@@ -548,6 +548,13 @@ export function pingpongTable(): BufFurniture {
   b.hline(21, 25, -10, '#8b93a3');
   b.rect(21, 18, 5, 3, '#3a3f4b');
   b.hline(21, 25, 18, '#8b93a3');
+  // Duas raquetes deitadas, uma de cada lado da rede, e a bolinha com sombra.
+  const paddle = ['.rRr....', 'rRrrd...', 'rrrrdhhh', '.rdd....'];
+  const pal = { r: '#d64545', R: '#ef7a6a', d: '#a83232', h: '#6b4a32' };
+  b.stamp(paddle, 4, 11, pal);
+  b.stamp(paddle, 36, 12, pal, true);
+  b.rect(15, 13, 2, 2, '#ffffff');
+  b.set(16, 15, 'rgba(20,30,60,0.35)');
   // Cantos arredondados.
   for (const [x, y] of [[0, -4], [47, -4]] as const) b.clear(x, y);
   b.outline();
