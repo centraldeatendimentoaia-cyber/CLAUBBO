@@ -20,10 +20,10 @@
 - [x] Textos novos com `tr()` e traduções en, es e fr. Teste no navegador de cada objeto.
 
 ### 3. Boneco de outra pessoa em tempo real (presença)
-- [ ] Desenho curto no fim deste arquivo (canal ao vivo do servidor, formato, limite de taxa, remoção ao desconectar, acesso).
-- [ ] Servidor: módulo `presenca.mjs` com testes (estado em memória por pessoa, limite de taxa, expiração, só `dono` e `equipe` com nome) e as rotas.
-- [ ] Cliente: envia a posição do boneco com limite de taxa; desenha o boneco dos outros com o personagem editado e o nome; remove ao sumir.
-- [ ] Teste com duas abas e duas pessoas no navegador.
+- [x] Desenho curto no fim deste arquivo (canal ao vivo do servidor, formato, limite de taxa, remoção ao desconectar, acesso).
+- [x] Servidor: módulo `presenca.mjs` com testes (estado em memória por pessoa, limite de taxa, expiração, só `dono` e `equipe` com nome) e as rotas.
+- [x] Cliente: envia a posição do boneco com limite de taxa; desenha o boneco dos outros com o personagem editado e o nome; remove ao sumir.
+- [x] Teste com duas abas e duas pessoas no navegador.
 
 ### 4. Celular controla tudo
 - [ ] Direcional na tela que chama `player.setIntent`, visível só em tela de toque.

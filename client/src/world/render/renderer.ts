@@ -881,8 +881,8 @@ export class Renderer {
       const sh = shadowSprite();
       ctx.drawImage(sh.canvas, x - sh.ax, y - sh.ay);
     }
-    // aura do modelo: só agentes, nunca o visitante nem quem veste o traje JMAL (visual exclusivo do dono)
-    const aura = ch === this.sim.visitor || ch.info.costume === 'jmal' ? null : auraDe(ch.info.model, ch.info.provider);
+    // aura do modelo: só agentes, nunca o visitante, as pessoas da presença nem quem veste o traje JMAL (visual exclusivo do dono)
+    const aura = ch === this.sim.visitor || this.sim.guests.has(ch.id) || ch.info.costume === 'jmal' ? null : auraDe(ch.info.model, ch.info.provider);
     let tx = 0;
     let ty = 0;
     if (aura) {

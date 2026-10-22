@@ -209,3 +209,46 @@ describe('móveis do prédio', () => {
     expect(posicaoDoAlvo(sim, a!)).not.toBeNull();
   });
 });
+
+describe('presença: convidados na simulação', () => {
+  const ANA = { name: 'Ana', look: 'f' as const };
+
+  it('aparece no ponto avisado, anda até o novo ponto e some ao ser removido; entra em people() e person()', () => {
+    const { sim, clock } = escritorio();
+    const id = 'convidado:ana';
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 10, 10, 'down');
+    const g = sim.guests.get(id)!;
+    expect(g).toBeDefined();
+    expect([g.x, g.y]).toEqual([10 * TILE, 10 * TILE]);
+    expect([...sim.people()]).toContain(g);
+    expect(sim.person(id)).toBe(g);
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 13, 10, 'up');
+    run(sim, clock, 5);
+    expect(g.x).toBeCloseTo(13 * TILE, 0);
+    expect(g.dir).toBe('up'); // chegou: vira para onde avisou
+    expect(g.pose).toBe('stand');
+    sim.removeGuest(id);
+    expect(sim.guests.size).toBe(0);
+    expect(sim.person(id)).toBeUndefined();
+  });
+
+  it('o convidado não é alvo do jogador (não entra em chars)', () => {
+    const { sim, clock } = escritorio();
+    sim.setVisitor(visitorInfo(ME, clock.now), clock.now);
+    run(sim, clock, 10, () => !sim.visitorBusy);
+    const v = sim.visitor!;
+    sim.setGuest('convidado:ana', visitorInfo(ANA, clock.now, 'convidado:ana'), v.x / TILE + 0.5, v.y / TILE, 'down');
+    v.dir = 'right';
+    expect(alvoDoJogador(sim)?.id).not.toBe('convidado:ana');
+    expect(sim.chars.has('convidado:ana')).toBe(false);
+  });
+
+  it('longe demais (outro canto do mapa) aparece direto no ponto, sem atravessar o prédio', () => {
+    const { sim, clock } = escritorio();
+    const id = 'convidado:ana';
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 5, 5, 'down');
+    sim.setGuest(id, visitorInfo(ANA, clock.now, id), 40, 20, 'left');
+    run(sim, clock, 0.2);
+    expect(sim.guests.get(id)!.x).toBeCloseTo(40 * TILE, 0);
+  });
+});

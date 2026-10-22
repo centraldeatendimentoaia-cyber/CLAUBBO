@@ -4,7 +4,7 @@ import * as artModule from '../art';
 import { TILE, type ArtModule } from '../art/api';
 import type { OfficeStore } from '../net/store';
 import { getFloor, onFloor, setFloor } from '../floor';
-import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type PlayerWorld, type Selection, type SocialEvent, type SoundCue, type WorldApi, type WorldOptions, type WorldPlayback } from './api';
+import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type Convidado, type PlayerWorld, type Selection, type SocialEvent, type SoundCue, type WorldApi, type WorldOptions, type WorldPlayback } from './api';
 import { loadWorldAssets, type WorldAssets } from './assets';
 import { createBuildingView, onToggleBuilding } from './building-view';
 import { Camera, overviewFrame } from './camera';
@@ -104,6 +104,17 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   /** Andar de destino pedido pelo elevador; a troca roda no início do próximo quadro, fora do passo da simulação. */
   let pendingPlayerFloor: number | null = null;
   const playerSim = (): Sim | undefined => layers.get(playerFloor)?.sim;
+  // Presença: as outras pessoas aparecem na simulação do andar em que estão (cada uma só em um andar).
+  let convidadosAtuais: readonly Convidado[] = [];
+  const syncConvidados = () => {
+    const now = Date.now();
+    for (const l of layers.values()) {
+      const aqui = playerMe && !playback ? convidadosAtuais.filter((c) => c.andar === l.floor) : [];
+      const ids = new Set(aqui.map((c) => c.id));
+      for (const id of [...l.sim.guests.keys()]) if (!ids.has(id)) l.sim.removeGuest(id);
+      for (const c of aqui) l.sim.setGuest(c.id, visitorInfo({ name: c.nome, look: c.look, ...(c.parts ? { parts: c.parts } : {}) }, now, c.id), c.x, c.y, c.dir);
+    }
+  };
   /** Põe o boneco no elevador do andar (null = tira de todos os andares). */
   const placePlayer = (floor: number | null) => {
     const now = Date.now();
@@ -125,6 +136,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const buildLayers = () => {
     layers.clear();
     for (const f of wantedFloors()) layers.set(f, makeLayer(f));
+    syncConvidados();
   };
   /** Acompanha as salas: andar novo ganha simulação (monta já pronto), andar sem sala some. */
   const syncLayers = () => {
@@ -134,6 +146,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     if (!layers.has(activeFloor)) setFloor(1);
     // o andar do boneco sumiu: ele volta ao elevador do andar 1
     if (playerMe && !playback && !playerSim()?.visitor && pendingPlayerFloor === null) placePlayer(1);
+    syncConvidados();
   };
   const useLayer = (floor: number) => {
     const l = layers.get(floor) ?? layers.get(1)!;
@@ -573,6 +586,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       pendingPlayerFloor = null;
       playerIntent = { ...NO_INTENT };
       placePlayer(playback ? null : activeFloor);
+      syncConvidados();
       if (!playback && !suspended && !userMoved) followVisitor();
     },
     desligar: () => {
@@ -582,7 +596,12 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       playerShift = false;
       playerIntent = { ...NO_INTENT };
       placePlayer(null);
+      syncConvidados();
       if (camera.follow === VISITOR_ID) camera.follow = null;
+    },
+    convidados: (lista) => {
+      convidadosAtuais = lista;
+      syncConvidados();
     },
     setIntent: (i) => {
       playerIntent = playerMe && !playback ? { ...i } : { ...NO_INTENT };

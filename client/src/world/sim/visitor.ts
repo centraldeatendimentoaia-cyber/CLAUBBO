@@ -30,9 +30,9 @@ export interface VisitorIntent {
 export const NO_INTENT: Readonly<VisitorIntent> = { dx: 0, dy: 0, run: false };
 
 /** O meu personagem do mundo (o `me` da cena), como agente do `Sim` só para desenhar. */
-export function visitorInfo(me: { name: string; look: 'f' | 'm'; parts?: AppearanceParts }, now: number): AgentInfo {
+export function visitorInfo(me: { name: string; look: 'f' | 'm'; parts?: AppearanceParts }, now: number, id: string = VISITOR_ID): AgentInfo {
   return {
-    id: VISITOR_ID,
+    id,
     kind: 'main',
     provider: 'claude',
     roomId: RECEPTION_ID,
@@ -40,7 +40,7 @@ export function visitorInfo(me: { name: string; look: 'f' | 'm'; parts?: Appeara
     look: me.look,
     ...(me.parts && Object.keys(me.parts).length ? { parts: me.parts } : {}),
     role: tr('Visitante'),
-    sessionId: VISITOR_ID,
+    sessionId: id,
     account: '',
     status: 'idle',
     recent: [],
@@ -49,7 +49,7 @@ export function visitorInfo(me: { name: string; look: 'f' | 'm'; parts?: Appeara
     lastEventAt: now,
     statusSince: now,
     stats: { toolCalls: 0, tokensIn: 0, tokensOut: 0, subagents: 0 },
-    seed: hash32(`${VISITOR_ID}:${me.name}`),
+    seed: hash32(`${id}:${me.name}`),
   };
 }
 
