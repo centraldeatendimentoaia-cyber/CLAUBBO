@@ -9,15 +9,15 @@
 ## Tarefas, na ordem do João
 
 ### 1. Bug: "Desafiar para um jogo" não funciona
-- [ ] Reproduzir no Chrome (menu `E` > Desafiar > aposta) e achar a causa de verdade (`systematic-debugging`).
-- [ ] Teste de regressão no servidor e correção na causa.
-- [ ] Partida completa a partir do menu no navegador. **Retorno parcial ao fechar este item.**
+- [x] Reproduzir no Chrome (menu `E` > Desafiar > aposta) e achar a causa de verdade (`systematic-debugging`).
+- [x] Teste de regressão no servidor e correção na causa.
+- [x] Partida completa a partir do menu no navegador. **Retorno parcial ao fechar este item.**
 
 ### 2. Interação com todos os objetos
-- [ ] Inventário dos móveis (`client/src/art/furniture/`, só leitura) e do que o mapa coloca em cada sala.
-- [ ] Alvo "objeto" em `world/player.ts` (mesmo raio e regra de frente do agente), com id estável do móvel; dica "E · …" no laço do menu.
-- [ ] Modelo puro do menu dos objetos (`interacao-model.ts`) com testes: fliperama e ping-pong (convidar agente ocioso ou jogar contra ele, reaproveitando `jogos.mjs` e as carteiras, só moedas), mais uma ação simples e coerente por tipo de móvel (sentar, pegar café, ver a lousa, ver a hora, olhar pela janela).
-- [ ] Textos novos com `tr()` e traduções en, es e fr. Teste no navegador de cada objeto.
+- [x] Inventário dos móveis (`client/src/art/furniture/`, só leitura) e do que o mapa coloca em cada sala.
+- [x] Alvo "objeto" em `world/player.ts` (mesmo raio e regra de frente do agente), com id estável do móvel; dica "E · …" no laço do menu.
+- [x] Modelo puro do menu dos objetos (`interacao-model.ts`) com testes: fliperama e ping-pong (convidar agente ocioso ou jogar contra ele, reaproveitando `jogos.mjs` e as carteiras, só moedas), mais uma ação simples e coerente por tipo de móvel (sentar, pegar café, ver a lousa, ver a hora, olhar pela janela). **Feito com ressalvas:** jogar contra a máquina e sentar com animação ficaram de fora (precisam de servidor e de pose novos); fliperama e ping-pong convidam agente ocioso, os demais móveis mostram uma ação em texto.
+- [x] Textos novos com `tr()` e traduções en, es e fr. Teste no navegador de cada objeto.
 
 ### 3. Boneco de outra pessoa em tempo real (presença)
 - [ ] Desenho curto no fim deste arquivo (canal ao vivo do servidor, formato, limite de taxa, remoção ao desconectar, acesso).

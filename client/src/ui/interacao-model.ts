@@ -7,7 +7,7 @@ import { ESCADAS_AURA } from '../world/render/aura';
 /** A menor aposta do jogo (o servidor aceita 5, 10 e 25). */
 const APOSTA_MINIMA = 5;
 
-export type Acao = 'conversar' | 'desafiar' | 'btw' | 'agradecer' | 'subir' | 'descer' | 'andar';
+export type Acao = 'conversar' | 'desafiar' | 'btw' | 'agradecer' | 'subir' | 'descer' | 'andar' | 'jogar' | 'usar';
 
 export interface ItemMenu {
   acao: Acao;
@@ -17,6 +17,8 @@ export interface ItemMenu {
   motivo?: string;
   /** Só no menu do elevador: o andar de destino. */
   andar?: number;
+  /** Só no menu de jogo de um móvel: o agente convidado. */
+  agenteId?: string;
 }
 
 export const MENSAGEM_SEM_ELEVADOR = 'Nenhum andar com elevador.';
