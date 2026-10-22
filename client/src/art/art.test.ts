@@ -656,6 +656,14 @@ describe('pisos e paredes', () => {
     expect(t.countOpaque()).toBe(CHUNK_PX * CHUNK_PX);
   });
 
+  it('o rodapé tem junta entre as peças a cada duas colunas e sombra na junta com a parede', () => {
+    const style = { base: '#eef1f4', trim: '#9fb0c4', pattern: 'plain' as WallPattern };
+    const px = (col: number, x: number, y: number) => Array.from(wallFaceTile(style, 0, col).data.slice((y * TILE + x) * 4, (y * TILE + x) * 4 + 3)).join(',');
+    const y = 2 * TILE - 2;
+    expect(px(1, TILE - 1, y)).not.toBe(px(0, TILE - 1, y));
+    expect(px(0, 5, 2 * TILE - 4)).not.toBe(px(0, 5, 2 * TILE - 5));
+  });
+
   it('paredes renderizam todos os padrões', () => {
     const patterns: WallPattern[] = ['plain', 'stripes', 'tiles', 'wood_panel', 'brick', 'glass', 'marble'];
     for (const p of patterns) {

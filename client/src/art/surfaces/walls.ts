@@ -41,6 +41,7 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
       const s = shade(base, -0.035);
       for (let x = 0; x < TILE; x += 4) b.rect(x, fy, 2, fh, s);
       for (let x = 1; x < TILE; x += 4) b.vline(x, fy, fy + fh - 1, shade(base, -0.02));
+      for (let x = 3; x < TILE; x += 4) b.vline(x, fy, fy + fh - 1, shade(base, 0.015));
       break;
     }
     case 'tiles': {
@@ -53,6 +54,7 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
         const off = (Math.floor(ry / 6) % 2) * 4;
         for (let x = off; x < TILE + 8; x += 8) b.vline((x + 7) % 16, fy + ry, Math.min(fy + fh - 1, fy + ry + 4), grout);
         b.hline(0, TILE - 1, fy + ry, shade(base, 0.035));
+        b.set(off + 1, fy + ry + 1, shade(base, 0.055));
       }
       break;
     }
@@ -68,6 +70,9 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
       b.hline(0, TILE - 1, top - 1, w.hi);
       b.hline(0, TILE - 1, top, w.lt);
       b.hline(0, TILE - 1, top + 1, w.dk);
+      // Travessa inferior do lambri.
+      b.hline(0, TILE - 1, fy + fh - 2, w.dk);
+      b.hline(0, TILE - 1, fy + fh - 3, w.lt);
       break;
     }
     case 'brick': {
@@ -83,6 +88,7 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
           for (let x = Math.max(0, x0); x < Math.min(TILE, x0 + 7); x++) {
             for (let yy = y; yy < Math.min(fy + fh, y + 3); yy++) b.set(x, yy, yy === y ? shade(tone, 0.03) : tone);
           }
+          if (r() < 0.12 && x0 + 2 >= 0 && x0 + 2 < TILE) b.set(x0 + 2, y + 1, shade(tone, -0.12));
           if (x0 + 7 >= 0 && x0 + 7 < TILE) b.vline(x0 + 7, y, Math.min(fy + fh - 1, y + 2), mortar);
         }
         if (y + 3 < fy + fh) b.hline(0, TILE - 1, y + 3, mortar);
@@ -135,11 +141,13 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
   b.rect(0, 0, TILE, WALL_CAP_H, cap);
   b.hline(0, TILE - 1, 0, shade(cap, 0.08));
   b.hline(0, TILE - 1, WALL_CAP_H - 1, shade(cap, -0.06));
-  // Rodapé.
+  // Rodapé: sombra na junta com a parede, aresta clara, corpo e junta entre as peças a cada duas colunas.
   const by = WALL_FACE_H - BASEBOARD_H;
+  if (pattern !== 'glass') b.hline(0, TILE - 1, by - 1, shade(base, -0.05));
   b.rect(0, by, TILE, BASEBOARD_H, trim);
   b.hline(0, TILE - 1, by, shade(trim, 0.08));
   b.hline(0, TILE - 1, WALL_FACE_H - 1, shade(trim, -0.08));
+  if (col % 2 === 1) b.vline(TILE - 1, by + 1, WALL_FACE_H - 1, shade(trim, -0.1));
   return b;
 }
 
