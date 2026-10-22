@@ -10,6 +10,9 @@ class FakeEl {
   title = '';
   hidden = false;
   tabIndex = 0;
+  width = 0;
+  height = 0;
+  getContext(): null { return null; }
   constructor(readonly tag: string) {}
   get textContent(): string { return this.children.map((c) => (typeof c === 'string' ? c : c.textContent)).join(''); }
   set textContent(v: string) { this.children = v ? [v] : []; }
@@ -41,6 +44,21 @@ describe('painel da holding (renderer)', () => {
     const first = el.children[0] as FakeEl;
     expect(first.attrs['aria-label']).toBe('Esperando você');
     expect(first.textContent).toContain('Esperando você');
+  });
+
+  it('elenco mostra o distintivo da faixa e as medalhas ganhas, sempre com texto', async () => {
+    const { el } = await render(view({ elenco: [{ agent: 'ana', xp: 800, nivel: 5, progresso: 0.5 }], rotinas: { rodaram: 2, falharam: 1, previstas: 0, lista: [] } }));
+    const labels = el.all().filter((e) => e.attrs.role === 'img').map((e) => e.attrs['aria-label']);
+    expect(labels).toContain('Cometa (nível 5)');
+    expect(labels).toContain('Primeiro brilho: Ganhou o primeiro XP');
+    expect(labels).toContain('Em ascensão: Chegou ao nível 3');
+    expect(labels.some((l) => l.startsWith('Veterano'))).toBe(false);
+    expect(labels.some((l) => l.startsWith('Dia limpo'))).toBe(false);
+  });
+
+  it('com rotinas rodando sem falha, o indicador de rotinas ganha a medalha "Dia limpo"', async () => {
+    const { el } = await render(view({ rotinas: { rodaram: 2, falharam: 0, previstas: 1, lista: [] } }));
+    expect(el.all().some((e) => e.attrs.role === 'img' && e.attrs['aria-label']?.startsWith('Dia limpo'))).toBe(true);
   });
 
   it('título de agente com HTML aparece como texto: nenhum img é criado', async () => {

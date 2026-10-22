@@ -132,3 +132,17 @@ Tokens em `client/src/ui/neon.css` (`:root`), usados pelas classes `hold-*`, `in
 
 Regras: cor nunca sozinha (acompanha forma ou texto); `prefers-reduced-motion` desliga animações; texto do servidor entra só por `textContent`.
 Lacunas conhecidas: os componentes ainda são específicos de cada tela (não há `neon-btn`, `neon-card` ou `neon-tag` genéricos) e a fonte Pixelify Sans só é importada em `art/preview.ts`.
+
+## 10. Distintivos (projeto 5)
+
+Módulo `client/src/art/badges.ts`: `levelTier(nivel)` (faixa 1 a 5; `TIER_FROM` = níveis 1, 3, 5, 8 e 12), `achievementsOf` (conquistas derivadas de XP, nível e rotinas do dia), `renderBadge` e `badgeCanvas` (16x16 px; ampliar por CSS com `image-rendering: pixelated`).
+
+| Faixa | Nome | Forma | Cor |
+|---|---|---|---|
+| 1 | Faísca | losango | lilás `#a99cc9` |
+| 2 | Chama | escudo | turquesa `#3ad3d0` |
+| 3 | Cometa | hexágono | lima `#7cff6b` |
+| 4 | Coroa | estrela de 4 pontas | rosa `#ff4fa3` |
+| 5 | Astro | estrela de 8 pontas | amarelo `#ffd23f` |
+
+Conquistas: Primeiro brilho, Em ascensão (nível 3), Veterano (nível 6), Lenda (nível 10) e Dia limpo. Por ganhar, a medalha fica cinza. Regra: o distintivo vem sempre com texto (`role="img"` e `aria-label`), e a faixa se distingue pela forma e pelos pontos, não só pela cor. Classe `.hold-badge` em `neon.css`.

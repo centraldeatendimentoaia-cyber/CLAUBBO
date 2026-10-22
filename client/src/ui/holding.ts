@@ -2,6 +2,7 @@
 // Fala com /api/holding da própria porta. Todo texto vindo de agente ou do servidor entra só por h()/textContent, nunca como HTML.
 // A lógica testável (atalhos, permissões, resultado das decisões) mora em holding-model.ts; aqui fica o desenho e a rede.
 import type { HoldingView, PendingItem } from '../../../shared/types';
+import { achievementsOf, badgeCanvas, levelTier, tierLabel, type Achievement } from '../art/badges';
 import { saldoDaCarteira } from '../net/interacao-api';
 import type { UiComponent, UiContext } from './context';
 import { h } from './dom';
@@ -80,6 +81,18 @@ function cartao(p: PendingItem, i: number, v: HoldingView, o: RenderOpts): HTMLE
   );
 }
 
+/** Distintivo em pixel com o texto como alternativa: o nome da faixa ou da conquista nunca fica só na cor. */
+function distintivo(spec: Parameters<typeof badgeCanvas>[0], texto: string): HTMLElement {
+  const c = document.createElement('canvas');
+  c.width = badgeCanvas(spec).width;
+  c.height = badgeCanvas(spec).height;
+  c.setAttribute('aria-hidden', 'true');
+  c.getContext('2d')?.drawImage(badgeCanvas(spec), 0, 0);
+  return h('span', { class: 'hold-badge', role: 'img', title: texto, attrs: { 'aria-label': texto } }, c);
+}
+
+const medalha = (a: Achievement): HTMLElement => distintivo({ kind: 'achievement', id: a.id, earned: a.earned }, `${a.name}: ${a.description}`);
+
 /** Desenha a página inteira a partir do que o servidor mandou. Sem rede, sem estado: o painel guarda o estado e chama isto. */
 export function renderHolding(v: HoldingView, o: RenderOpts): HTMLElement {
   const fila = sortPending(v.pendencias ?? []);
@@ -120,12 +133,13 @@ export function renderHolding(v: HoldingView, o: RenderOpts): HTMLElement {
 
   const r = v.rotinas ?? { rodaram: 0, falharam: 0, previstas: 0, lista: [] };
   const falhas = r.lista.filter((x) => x.estado === 'falhou');
+  const diaLimpo = achievementsOf({ nivel: 1, xp: 0, rotinas: r }).find((a) => a.id === 'dia_limpo' && a.earned);
   const kpi = (valor: string, rotulo: string, cor: string, extra?: Node) =>
     h('div', { class: 'hold-kpi' }, h('b', { class: `hold-cor--${cor}-txt` }, extra ?? null, valor), h('span', { text: rotulo }));
   const faixa = h(
     'section',
     { class: 'hold-strip', attrs: { 'aria-label': 'Indicadores' } },
-    kpi(`${r.rodaram}/${r.rodaram + r.falharam + r.previstas}`, 'ROTINAS DE HOJE', 'lima'),
+    kpi(`${r.rodaram}/${r.rodaram + r.falharam + r.previstas}`, 'ROTINAS DE HOJE', 'lima', diaLimpo ? medalha(diaLimpo) : undefined),
     kpi(String(r.falharam), r.falharam ? `${tipo(r.falharam, 'FALHOU', 'FALHARAM')} · ${falhas.map((f) => f.title).join(', ').toUpperCase()}` : 'FALHAS', r.falharam ? 'rosa' : 'lilas', r.falharam ? h('span', { class: 'hold-forma hold-forma--triangulo hold-cor--rosa', attrs: { 'aria-hidden': 'true' } }) : undefined),
     kpi(`+${v.xpHoje ?? 0}`, 'XP DO ELENCO HOJE', 'turquesa'),
     kpi(o.coins === null ? '—' : `🪙 ${o.coins}`, 'MOEDAS DO ESCRITÓRIO', 'amarelo'),
@@ -156,8 +170,10 @@ export function renderHolding(v: HoldingView, o: RenderOpts): HTMLElement {
       return h(
         'div',
         { class: 'hold-row' },
+        distintivo({ kind: 'tier', tier: levelTier(e.nivel).tier }, tierLabel(e.nivel)),
         h('span', { class: 'hold-row__t', text: e.agent }),
         h('small', { text: `Nv ${e.nivel} · ${e.xp} XP` }),
+        ...achievementsOf({ nivel: e.nivel, xp: e.xp }).filter((a) => a.earned && a.id !== 'dia_limpo').map(medalha),
         h('div', { class: 'hold-bar', role: 'progressbar', attrs: { 'aria-label': `Progresso de ${e.agent} para o próximo nível`, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct } }, h('i', { style: `width:${pct}%` })),
       );
     }),

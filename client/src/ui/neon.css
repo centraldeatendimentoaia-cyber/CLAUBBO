@@ -146,3 +146,6 @@
 .jogo button:focus-visible { outline: 3px solid var(--neon-amarelo); outline-offset: 2px; }
 @keyframes jogo-piscar { 50% { opacity: 0.2; } }
 @media (prefers-reduced-motion: reduce) { .jogo-mesa.is-revelando span:last-child { animation: none; } .jogo .int-btn:active { transform: none; } }
+.hold-badge { display: inline-flex; flex: none; }
+.hold-badge canvas { width: 24px; height: 24px; image-rendering: pixelated; }
+.hold-kpi .hold-badge canvas { width: 20px; height: 20px; }
