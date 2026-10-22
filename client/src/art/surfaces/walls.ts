@@ -120,6 +120,13 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
     }
     case 'plain':
       if (style.exterior) speckle(b, variant * 13 + col, 5, [shade(base, -0.03), shade(base, 0.03)]);
+      else {
+        // Friso de meia altura: o tom escurece um pouco abaixo dele, com aresta clara e sombra.
+        const rail = fy + Math.floor(fh * 0.55);
+        b.rect(0, rail + 1, TILE, fy + fh - rail - 1, shade(base, -0.025));
+        b.hline(0, TILE - 1, rail, shade(base, 0.05));
+        b.hline(0, TILE - 1, rail + 1, shade(base, -0.075));
+      }
       break;
   }
   // Sombra projetada pela tampa.
