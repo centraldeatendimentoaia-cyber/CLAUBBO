@@ -17,6 +17,8 @@ export class AppearanceFields {
   /** Grupos de peças (pele, cabelo...), redesenhados a cada escolha. */
   readonly groups: HTMLElement;
   private draft: Appearance | null = null;
+  /** Fantasia desenhada por cima da aparência na prévia (a JMAL do dono); não faz parte das peças editáveis. */
+  costume: 'jmal' | undefined;
 
   constructor(private readonly onChange: (a: Appearance) => void = () => {}) {
     this.preview = h('canvas', { class: 'ui-char__preview', role: 'img', attrs: { 'aria-label': tr('Prévia do personagem') } });
@@ -103,7 +105,7 @@ export class AppearanceFields {
 
   private drawPreview(a: Appearance): void {
     try {
-      const s = characterSprite({ appearance: a, dir: 'down', pose: 'stand', frame: 0 });
+      const s = characterSprite({ appearance: a, dir: 'down', pose: 'stand', frame: 0, ...(this.costume ? { costume: this.costume } : {}) });
       const c = this.preview;
       c.width = s.canvas.width * PREVIEW_SCALE;
       c.height = s.canvas.height * PREVIEW_SCALE;

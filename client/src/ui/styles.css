@@ -11490,3 +11490,17 @@ details.op-card > .bd-btn, .op-copy, .op-summary { margin-top: 10px; }
 .ui-pets__name, .ui-pets__floor, .ui-pets__tutor { min-width: 0; height: 26px; border-radius: 6px; border: 1px solid var(--ui-line, rgba(255, 255, 255, 0.16)); background: rgba(255, 255, 255, 0.06); color: inherit; font: inherit; font-size: 12px; padding: 0 6px; }
 .ui-pets__del { padding: 0; }
 .ui-pets__add { grid-template-columns: repeat(3, 1fr); }
+
+/* Equipe na barra: um avatar por pessoa; o dono (skin JMAL) ganha o contorno dourado. */
+.ui-equipe { display: flex; align-items: center; gap: 4px; flex: none; margin-left: 4px; }
+.ui-equipe__pessoa { display: inline-flex; padding: 1px; background: transparent; border: 1px solid var(--ui-line); border-radius: 8px; cursor: pointer; }
+.ui-equipe__pessoa.is-dono { border-color: #f2c94c; }
+.ui-equipe__pessoa[aria-disabled='true'] { cursor: default; opacity: 0.85; }
+.ui-equipe__pessoa:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.ui-char.ui-equipe-editor { margin-top: 0; animation: none; position: fixed; z-index: 90; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 420px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; padding: 12px; background: #141821; border: 1px solid var(--ui-line-strong); border-radius: 12px; box-shadow: 0 12px 40px rgba(5, 7, 12, 0.5); box-sizing: border-box; }
+.ui-equipe-editor__titulo { margin: 0 0 8px; font-weight: 700; }
+@media (max-width: 720px) { .ui-equipe { display: none; } }
+
+/* Humor do agente ao lado do nome (só animado ou chateado; o neutro não mostra nada). */
+[data-humor='animado']::after { content: ' \1F604'; }
+[data-humor='chateado']::after { content: ' \1F61E'; }

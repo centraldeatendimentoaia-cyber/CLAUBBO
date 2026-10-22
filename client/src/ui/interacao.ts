@@ -3,12 +3,14 @@
 // e a rede. Todo texto vindo de agente ou do servidor entra só por h()/textContent, nunca como HTML.
 // Todos os papéis veem as mesmas ações: quem decide (403, 409) é o servidor.
 import { getFloor } from '../floor';
-import { agradecer, obrigadosPossiveis, perguntarBtw, trocarModelo } from '../net/interacao-api';
+import { agradecer, obrigadosPossiveis, perguntarBtw, saldoDaCarteira, trocarModelo } from '../net/interacao-api';
 import type { WorldSceneMe } from '../../../shared/world/api';
 import type { Alvo } from '../world/player';
 import type { PlayerWorld } from '../world/api';
 import type { UiContext } from './context';
 import { h } from './dom';
+import { abrirJogo } from './jogo';
+import { humorRotulo } from './jogo-model';
 import { aparenciaDoJogador, criarGuarda, MENSAGEM_SEM_ELEVADOR, mensagemDaFalha, menuDoAgente, menuDoElevador, vizinhos, type ItemMenu } from './interacao-model';
 
 const BTW_MAX = 500;
@@ -30,6 +32,8 @@ export class Interacao {
   private indice = 0;
   /** null = /api/xp ainda não respondeu. */
   private obrigados: Set<string> | null = null;
+  /** Saldo da pessoa no servidor (GET /api/carteira); null = ainda não respondeu ou falhou. */
+  private saldo: number | null = null;
   /** Uma chamada de rede por vez: troca de modelo, obrigado e btw. */
   private readonly guarda = criarGuarda();
   private abriuPor: Element | null = null;
@@ -210,6 +214,7 @@ export class Interacao {
     this.indice = 0;
     this.abriuPor = document.activeElement;
     this.obrigados = null;
+    this.saldo = null;
     const painel = h('div', { class: 'int' });
     painel.style.left = `${Math.max(8, Math.min(Math.round(pos.x) + 24, innerWidth - 300))}px`;
     painel.style.top = `${Math.max(8, Math.min(Math.round(pos.y) - 24, innerHeight - 340))}px`;
@@ -220,6 +225,11 @@ export class Interacao {
       void obrigadosPossiveis().then((ids) => {
         if (this.painel !== painel) return;
         this.obrigados = ids;
+        if (this.vista.tipo === 'menu') this.desenhar();
+      });
+      void saldoDaCarteira().then((saldo) => {
+        if (this.painel !== painel) return;
+        this.saldo = saldo;
         if (this.vista.tipo === 'menu') this.desenhar();
       });
     }
@@ -240,7 +250,7 @@ export class Interacao {
     if (a.tipo === 'agente') {
       const ag = this.ctx.agent(a.id);
       if (!ag) return [];
-      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null });
+      return menuDoAgente({ model: ag.model, provider: ag.provider, status: ag.status, ocioso: ag.status === 'idle', obrigadoPossivel: this.obrigados?.has(a.id) ?? false, carregando: this.obrigados === null, saldoPessoa: this.saldo });
     }
     return menuDoElevador(this.andares(), getFloor());
   }
@@ -271,7 +281,9 @@ export class Interacao {
         this.ctx.select({ type: 'agent', id: a.id }, { focus: true });
         break;
       case 'desafiar':
-        this.texto('Desafio', 'Os jogos chegam no projeto 4. Por enquanto não há nenhum jogo para jogar.');
+        // o menu fecha e o painel do jogo assume o teclado; o servidor recusa (403, 409, 422) o que não puder
+        this.fechar();
+        abrirJogo({ agente: { id: a.id, name: ag.name, humor: ag.humor }, aoFechar: () => this.ctx.invalidate() });
         break;
       case 'btw':
         this.vista = { tipo: 'btw', resposta: '', enviando: false };
@@ -376,6 +388,10 @@ export class Interacao {
       const itens = this.itens();
       this.indice = Math.min(this.indice, Math.max(0, itens.length - 1));
       p.append(h('div', { class: 'int-titulo', text: titulo }));
+      if (ag) {
+        const humor = humorRotulo(ag.humor);
+        p.append(h('p', { class: 'int-humor', text: `Humor: ${humor.icone} ${humor.palavra}` }));
+      }
       if (!itens.length) p.append(h('p', { class: 'int-texto', text: MENSAGEM_SEM_ELEVADOR }));
       const lista = h('div', { role: 'menu', attrs: { 'aria-label': titulo } });
       itens.forEach((it, i) => {

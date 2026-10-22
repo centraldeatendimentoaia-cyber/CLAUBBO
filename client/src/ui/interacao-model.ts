@@ -3,6 +3,9 @@
 import type { AppearanceParts } from '../../../shared/appearance';
 import { ESCADAS_AURA } from '../world/render/aura';
 
+/** A menor aposta do jogo (o servidor aceita 5, 10 e 25). */
+const APOSTA_MINIMA = 5;
+
 export type Acao = 'conversar' | 'desafiar' | 'btw' | 'agradecer' | 'subir' | 'descer' | 'andar';
 
 export interface ItemMenu {
@@ -25,6 +28,8 @@ export interface AgenteMenu {
   obrigadoPossivel: boolean;
   /** A lista de quem pode receber obrigado ainda não chegou. */
   carregando?: boolean;
+  /** Saldo da pessoa (GET /api/carteira); null ou ausente = ainda não se sabe. */
+  saldoPessoa?: number | null;
 }
 
 /** A escada do provedor (contas Codex usam a do Codex; qualquer outra, a do Claude). */
@@ -52,11 +57,12 @@ export function menuDoAgente(a: AgenteMenu): ItemMenu[] {
     if (!destino) return { acao, rotulo: nome, atalho, habilitado: false, motivo: subir ? 'já no topo' : 'já na base' };
     return { acao, rotulo: `${nome} ${subir ? '▲' : '▼'} ${a.model} → ${destino}`, atalho, habilitado: true };
   };
+  const semMoedas = typeof a.saldoPessoa === 'number' && a.saldoPessoa < APOSTA_MINIMA;
+  const motivoDesafio = !a.ocioso ? 'só agente ocioso' : semMoedas ? 'sem moedas' : undefined;
+  const desafio: ItemMenu = { acao: 'desafiar', rotulo: 'Desafiar para um jogo', atalho: '2', habilitado: !motivoDesafio, ...(motivoDesafio ? { motivo: motivoDesafio } : {}) };
   return [
     { acao: 'conversar', rotulo: 'Conversar / dar tarefa', atalho: '1', habilitado: true },
-    a.ocioso
-      ? { acao: 'desafiar', rotulo: 'Desafiar para um jogo', atalho: '2', habilitado: true }
-      : { acao: 'desafiar', rotulo: 'Desafiar para um jogo', atalho: '2', habilitado: false, motivo: 'só agente ocioso' },
+    desafio,
     { acao: 'btw', rotulo: 'Perguntar /btw', atalho: '3', habilitado: true },
     a.obrigadoPossivel
       ? { acao: 'agradecer', rotulo: 'Agradecer pelo trabalho', atalho: '4', habilitado: true }

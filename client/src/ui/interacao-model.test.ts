@@ -18,6 +18,19 @@ describe('menuDoAgente', () => {
     expect(d.motivo).toBe('só agente ocioso');
   });
 
+  it('saldo conhecido abaixo de 5: desafiar apagado com motivo; desconhecido ou >= 5 fica habilitado', () => {
+    const d = (saldoPessoa?: number | null) => por(menuDoAgente({ ...base, saldoPessoa }), 'desafiar');
+    expect(d(4)).toMatchObject({ habilitado: false, motivo: 'sem moedas' });
+    expect(d(0).habilitado).toBe(false);
+    expect(d(5).habilitado).toBe(true);
+    expect(d(null).habilitado).toBe(true);
+    expect(d(undefined).habilitado).toBe(true);
+  });
+
+  it('agente ocupado vence o motivo de saldo', () => {
+    expect(por(menuDoAgente({ ...base, ocioso: false, saldoPessoa: 0 }), 'desafiar').motivo).toBe('só agente ocioso');
+  });
+
   it('sem resultado novo: agradecer apagado', () => {
     const a = por(menuDoAgente({ ...base, obrigadoPossivel: false }), 'agradecer');
     expect(a.habilitado).toBe(false);

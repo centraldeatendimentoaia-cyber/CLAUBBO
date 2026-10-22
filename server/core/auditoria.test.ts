@@ -17,8 +17,9 @@ describe('quais rotas são auditadas', () => {
     ['DELETE', '/api/agents/marina'], ['PUT', '/api/company'], ['DELETE', '/api/conversation/x'], ['PUT', '/api/offices/a'],
     ['POST', '/api/backups/2026-10-19/restore'], ['POST', '/api/agent-proposals/p1/approve'], ['POST', '/api/ops/tasks/t1/approve'], ['POST', '/api/rooms/rename'], ['POST', '/api/deliveries/upload/a/b.png'],
     ['POST', '/api/cli/requests/r1/approve'], ['POST', '/api/agent-calls/c1/approve'], ['POST', '/api/pendencias/aprovar-seguros'], ['POST', '/api/agentes/a1/modelo'], ['POST', '/api/agentes/a1/obrigado'], ['POST', '/api/agentes/a1/btw'], ['POST', '/api/xp/ficou-bom'],
+    ['POST', '/api/jogos/desafio'], ['POST', '/api/jogos/3f2a-bc/jogada'], ['POST', '/api/equipe/Ana/personagem'],
   ])('audita %s %s', (m, p) => expect(shouldAudit(m, p)).toBe(true));
-  it.each([['GET', '/api/agents/marina'], ['POST', '/api/messages'], ['POST', '/api/build/rooms'], ['GET', '/api/holding'], ['GET', '/api/permissions/x1'], ['POST', '/api/pendencias/aprovar-seguros/x']])('não audita %s %s', (m, p) => expect(shouldAudit(m, p)).toBe(false));
+  it.each([['GET', '/api/agents/marina'], ['POST', '/api/messages'], ['POST', '/api/build/rooms'], ['GET', '/api/holding'], ['GET', '/api/permissions/x1'], ['POST', '/api/pendencias/aprovar-seguros/x'], ['GET', '/api/jogos/abc'], ['GET', '/api/carteira'], ['POST', '/api/jogos/desafio/x'], ['POST', '/api/jogos/a/b/jogada'], ['POST', '/api/jogos/a%2Fb/jogada'], ['GET', '/api/equipe'], ['POST', '/api/equipe/a/b/personagem']])('não audita %s %s', (m, p) => expect(shouldAudit(m, p)).toBe(false));
 });
 
 describe('gravação', () => {

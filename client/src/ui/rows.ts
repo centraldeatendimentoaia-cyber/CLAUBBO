@@ -4,6 +4,7 @@ import { createAvatar, updateAvatar, type AvatarSize } from './avatar';
 import { h, setAttr, setHidden, setStyleVar, setText, setTitle, setVariant } from './dom';
 import { formatDuration } from './format';
 import { createQuota, updateQuota } from './quota';
+import { humorEtiqueta } from './jogo-model';
 import { activityFallback, shellLine, shellWaitIn, statusLabel } from './model';
 import {
   createAccountChip,
@@ -78,6 +79,7 @@ export function updateAgentRow(
   setStyleVar(row, '--acc', account?.color ?? '#8b98b3');
   setText(r.name, agent.name);
   r.name.classList.toggle('is-owner', agent.costume === 'jmal'); // o dono (JMAL): nome em vermelho
+  { const hum = humorEtiqueta(agent.humor); if (hum) r.name.dataset.humor = hum.palavra; else delete r.name.dataset.humor; r.name.title = hum ? `Humor: ${hum.palavra}` : ''; } // etiqueta ao lado do nome
   updateAccountChip(r.chip, account, agent.account, agent.provider);
   updateRoleBadge(r.role, agent);
   updateQuota(r.quota, account, now);

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
-import { IPV4, hostAllowed, isLoopback, newPhoneToken, phoneGate } from './acesso.mjs';
+import { IPV4, PHONE_WRITES, hostAllowed, isLoopback, newPhoneToken, phoneGate } from './acesso.mjs';
 
 const TOKEN = newPhoneToken();
 const req = (method: string, cookie = '') => ({ method, headers: cookie ? { cookie } : {} });
@@ -110,6 +110,21 @@ describe('modo celular', () => {
       expect(phoneGate(req('POST', `v2_cel_4530=${ANA}`), url('/api/agentes/x/btw'), TOKEN, 4530, team).action).toBe('allow');
       expect(phoneGate(req('POST', `v2_cel_4530=${'b'.repeat(64)}`), url('/api/agentes/x/modelo'), TOKEN, 4530, team)).toMatchObject({ action: 'deny', status: 403 });
       expect(phoneGate(req('PUT', `v2_cel_4530=${ANA}`), url('/api/agentes/x'), TOKEN, 4530, team).action).toBe('deny');
+    });
+
+    it('jogos: equipe passa só em POST desafio e jogada; GET e variantes com .. ou %2F não são escrita do celular', () => {
+      const c = `v2_cel_4530=${ANA}`;
+      expect(phoneGate(req('POST', c), url('/api/jogos/desafio'), TOKEN, 4530, team).action).toBe('allow');
+      expect(phoneGate(req('POST', c), url('/api/jogos/3f2a-bc/jogada'), TOKEN, 4530, team).action).toBe('allow');
+      for (const p of ['/api/jogos/../jogada', '/api/jogos/a%2Fb/jogada', '/api/jogos/a/b/jogada', '/api/jogos/desafio/x', '/api/jogos/x/jogada/y']) expect(PHONE_WRITES.test(p)).toBe(false);
+      expect(phoneGate(req('PUT', c), url('/api/jogos/desafio'), TOKEN, 4530, team).action).toBe('deny');
+    });
+
+    it('equipe: passa só POST /api/equipe/<nome>/personagem; GET, PUT e variantes com barra não são escrita do celular', () => {
+      const c = `v2_cel_4530=${ANA}`;
+      expect(phoneGate(req('POST', c), url('/api/equipe/Ana/personagem'), TOKEN, 4530, team).action).toBe('allow');
+      for (const p of ['/api/equipe/a/b/personagem', '/api/equipe//personagem', '/api/equipe/Ana/personagem/x', '/api/equipe/Ana']) expect(PHONE_WRITES.test(p)).toBe(false);
+      expect(phoneGate(req('PUT', c), url('/api/equipe/Ana/personagem'), TOKEN, 4530, team).action).toBe('deny');
     });
 
     it('com V2_CELULAR_ESCRITA=1 só o token do dono escreve fora de aprovar/recusar; a equipe nunca (I2)', () => {
