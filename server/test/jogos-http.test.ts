@@ -39,8 +39,11 @@ beforeAll(async () => {
   port = await freePort();
   const dead = await freePort();
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v2-jogos-http-'));
+  // Conta Principal "conectada" de mentira (arquivo vazio na pasta temporária) e turno lento: a tarefa fica em andamento e o agente, ocupado.
+  fs.mkdirSync(path.join(dir, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.claude', '.credentials.json'), '{}');
   child = spawn(process.execPath, [path.join(here, '..', 'bridge.mjs')], {
-    env: { ...process.env, BRIDGE_PORT: String(port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: data(''), V2_HOME: dir, V2_BRAIN: path.join(dir, 'brain'), V2_SECRETS: path.join(dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'nao' },
+    env: { ...process.env, BRIDGE_PORT: String(port), CLAUBBO_URL: `http://127.0.0.1:${dead}`, V2_DATA: data(''), V2_HOME: dir, V2_BRAIN: path.join(dir, 'brain'), V2_SECRETS: path.join(dir, 'segredos'), V2_TELEGRAM: 'off', V2_CLAUDE_BIN: process.execPath, V2_CLAUDE_PRE: JSON.stringify([path.join(here, 'fake-claude.mjs')]), V2_CONFIRMACAO: 'nao', FAKE_DELAY_MS: '60000' },
     stdio: 'ignore',
   });
   for (let i = 0; i < 60; i++) { const r = await raw(port, 'GET', '/api/health').catch(() => null); if (r?.status === 200) return; await sleep(250); }
@@ -112,5 +115,50 @@ describe('quem não pode jogar e casos recusados', () => {
     expect((await page('POST', '/api/jogos/desafio', { agente: 'jogador-b', aposta: 7 })).status).toBe(400);
     expect((await page('POST', '/api/jogos/desafio', { agente: 'nao-existe', aposta: 5 })).status).toBe(404);
     expect((await page('GET', '/api/jogos/naoexiste')).status).toBe(404);
+  });
+});
+
+describe('agente ocupado', () => {
+  it('com tarefa em andamento recusa o desafio com 409 e nenhuma moeda sai', async () => {
+    await novoAgente('jogador-c');
+    expect((await page('POST', '/api/ops/tasks', { agent: 'jogador-c', text: 'tarefa de teste' })).status).toBe(201);
+    for (let i = 0; i < 20; i++) { // espera a tarefa sair de "next" para "doing" (turno lento do agente falso)
+      const t = JSON.parse(fs.readFileSync(data('tasks.json'), 'utf8')).find((x: any) => x.agent === 'jogador-c');
+      if (t?.state === 'doing') break; await sleep(100);
+    }
+    const antes = (await page('GET', '/api/carteira')).body.saldo, somaAntes = somaCarteiras();
+    const r = await page('POST', '/api/jogos/desafio', { agente: 'jogador-c', aposta: 5 });
+    expect(r.status).toBe(409);
+    expect((await page('GET', '/api/carteira')).body.saldo).toBe(antes);
+    expect(somaCarteiras()).toBe(somaAntes);
+  });
+});
+
+describe('equipe na barra', () => {
+  it('lista o dono com a skin JMAL, sem hash nem token, e o nome de quem pergunta', async () => {
+    const r = await page('GET', '/api/equipe');
+    expect(r.status).toBe(200); expect(r.body.eu).toBe('dono');
+    expect(r.body.equipe[0]).toMatchObject({ nome: 'dono', rotulo: 'JMAL', costume: 'jmal' });
+    expect(JSON.stringify(r.body)).not.toMatch(/hash|token/);
+  });
+  it('o dono salva o personagem; o servidor mantém a fantasia JMAL mesmo se o corpo pedir outra', async () => {
+    const corpo = { seed: 42, look: 'm', parts: { hair: '#112233', hairStyle: 'bob' }, costume: 'reaper' };
+    const r = await page('POST', '/api/equipe/dono/personagem', corpo);
+    expect(r.status).toBe(200); expect(r.body.pessoa).toMatchObject({ seed: 42, look: 'm', costume: 'jmal', custom: true });
+    expect((await page('GET', '/api/equipe')).body.equipe[0]).toMatchObject({ seed: 42, parts: { hair: '#112233' } });
+  });
+  it('corpo inválido é 400, pessoa inexistente é 404, agente e escrita sem token são 403', async () => {
+    expect((await page('POST', '/api/equipe/dono/personagem', { seed: 1, look: 'm', parts: { hairStyle: 'raio' } })).status).toBe(400);
+    expect((await page('POST', '/api/equipe/ninguem/personagem', { seed: 1, look: 'm', parts: {} })).status).toBe(404);
+    expect((await agente('POST', '/api/equipe/dono/personagem', { seed: 1, look: 'm', parts: {} })).status).toBe(403);
+    expect((await semToken('POST', '/api/equipe/dono/personagem', { seed: 1, look: 'm', parts: {} })).status).toBe(403);
+    expect((await agente('GET', '/api/equipe')).status).toBe(403);
+  });
+  it('a gravação entra na auditoria com o nome', () => {
+    expect(linhasAuditoria().some((l) => l.path === '/api/equipe/dono/personagem' && l.nome === 'dono')).toBe(true);
+  });
+  it('o reset volta ao personagem sorteado', async () => {
+    const r = await page('POST', '/api/equipe/dono/personagem', { reset: true });
+    expect(r.status).toBe(200); expect(r.body.pessoa.custom).toBe(false);
   });
 });
