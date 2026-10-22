@@ -138,6 +138,24 @@ describe('personagens', () => {
     }
   });
 
+  it('cada estilo de roupa e cada acessório tem desenho próprio, no mesmo tamanho de sprite', () => {
+    const seen = new Set<string>();
+    for (const topStyle of TOP_STYLES) {
+      const s = renderCharacter({ appearance: { ...a, topStyle, accessory: 'none' }, dir: 'down', pose: 'stand', frame: 0 });
+      expect([s.buf.w, s.buf.h]).toEqual([CHAR_W, CHAR_H]);
+      seen.add(digest(s.buf.data));
+    }
+    expect(seen.size).toBe(TOP_STYLES.length);
+    for (const dir of DIRS) {
+      const plain = digest(renderCharacter({ appearance: { ...a, accessory: 'none' }, dir, pose: 'stand', frame: 0 }).buf.data);
+      for (const accessory of ACCESSORIES.filter((x) => x !== 'none')) {
+        const s = renderCharacter({ appearance: { ...a, accessory }, dir, pose: 'stand', frame: 0 });
+        expect([s.buf.w, s.buf.h]).toEqual([CHAR_W, CHAR_H]);
+        if (dir !== 'up' || accessory !== 'earrings') expect(digest(s.buf.data), `${accessory}/${dir}`).not.toBe(plain);
+      }
+    }
+  });
+
   it('em pé, os pés tocam a âncora', () => {
     for (const dir of DIRS) {
       const s = renderCharacter({ appearance: a, dir, pose: 'stand', frame: 0 });

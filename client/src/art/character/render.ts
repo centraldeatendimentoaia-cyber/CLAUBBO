@@ -758,6 +758,7 @@ function drawAccessory(dc: Dc): void {
           put(x0 + 2, 10, fr);
           put(x0, 11, fr);
           put(x0 + 2, 11, lens);
+          put(x0, 9, 'rgba(255,255,255,0.45)');
         }
         for (const cx of [1, 2, 6, 7, 11, 12]) put(cx, 10, it.base);
       } else if (v === 'side') {
@@ -779,6 +780,8 @@ function drawAccessory(dc: Dc): void {
         for (const cx of [2, 3, 4, 5, 8, 9, 10, 11]) put(cx, 11, cx === 3 || cx === 9 ? '#5a6b8a' : '#15161c');
         put(0, 10, '#15161c');
         put(13, 10, '#15161c');
+        put(4, 10, '#46557a');
+        put(10, 10, '#46557a');
       } else if (v === 'side') {
         for (let cx = 1; cx <= 4; cx++) put(cx, 10, '#15161c');
         for (let cx = 1; cx <= 3; cx++) put(cx, 11, cx === 2 ? '#5a6b8a' : '#15161c');
@@ -806,7 +809,7 @@ function drawAccessory(dc: Dc): void {
           put(12, cy, it.dk);
         }
         for (let cy = 9; cy <= 12; cy++) {
-          put(0, cy, it.base);
+          put(0, cy, cy === 10 ? it.lt : it.base);
           put(1, cy, cy === 9 ? it.lt : it.base);
           put(12, cy, it.dk);
           put(13, cy, it.dk);
@@ -1156,6 +1159,9 @@ function drawTorso(dc: Dc): void {
           b.set(12, yy, ac.dk);
         }
         b.set(11, y + 5, ac.dk);
+        // Bolso do peito.
+        b.hline(9, 10, y + 2, t.lt);
+        b.hline(9, 10, y + 3, t.dk);
       } else {
         b.rect(9, y, 6, 1, t.hi);
       }
@@ -1165,6 +1171,7 @@ function drawTorso(dc: Dc): void {
       b.rect(8, y + 2, 8, 1, ac.base);
       b.set(15, y + 2, ac.dk);
       b.rect(8, y + 5, 8, 1, t.dd);
+      for (let cx = 9; cx < 16; cx += 2) b.set(cx, y + 5, t.dk);
       break;
     case 'jacket':
       if (front) {
@@ -1175,6 +1182,10 @@ function drawTorso(dc: Dc): void {
         b.set(13, y, t.lt);
         b.set(10, y + 1, t.lt);
         b.set(13, y + 1, t.base);
+        // Bolsos de aba nas laterais.
+        b.hline(8, 9, y + 4, t.dk);
+        b.set(8, y + 3, t.lt);
+        b.hline(14, 15, y + 4, t.dd);
       } else {
         b.vline(11, y + 1, y + 5, t.dk);
         b.rect(9, y, 6, 1, t.lt);
@@ -1186,6 +1197,7 @@ function drawTorso(dc: Dc): void {
         b.set(11, y + 1, ac.lt);
         b.set(12, y + 1, ac.base);
         b.set(11, y + 3, ac.dk);
+        b.set(12, y + 4, ac.lt);
       } else b.rect(9, y, 6, 1, ac.base);
       b.rect(7, y + 5, 10, 1, t.dk);
       b.set(7, y + 5, t.base);
@@ -1200,6 +1212,7 @@ function drawTorso(dc: Dc): void {
         b.set(12, y, t.dk);
         b.set(11, y + 1, t.dk);
         b.set(11, y + 2, ac.lt);
+        b.set(11, y + 4, ac.lt);
       } else b.rect(9, y, 6, 1, ac.base);
       break;
   }
