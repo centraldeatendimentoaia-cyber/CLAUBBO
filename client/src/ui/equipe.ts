@@ -59,6 +59,7 @@ export class EquipeBar implements UiComponent {
     let base: Appearance = appearanceFromSeed(seed, { look: p.look });
     let ocupado = false;
     const fields = new AppearanceFields();
+    fields.costume = p.costume;
     fields.set({ ...base, ...p.parts });
     const aviso = h('p', { class: 'ui-char__error', role: 'alert', hidden: true });
     const erro = (t: string | null) => { aviso.textContent = t ?? ''; aviso.hidden = !t; };
@@ -80,10 +81,10 @@ export class EquipeBar implements UiComponent {
     const painel = h('section', { class: 'ui-char ui-equipe-editor', role: 'dialog', attrs: { 'aria-modal': 'true', 'aria-label': `Editar personagem de ${p.rotulo}` }, on: { keydown: (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); fechar(); } } } },
       h('p', { class: 'ui-equipe-editor__titulo', text: p.rotulo }),
       h('div', { class: 'ui-char__top' }, fields.preview, h('div', { class: 'ui-char__head' }, h('button', { class: 'ui-btn ui-btn--sm', type: 'button', text: 'Sortear', title: 'Sortear outra aparência (desfaz as peças escolhidas)', on: { click: () => { seed = novaSeed(); base = appearanceFromSeed(seed, { look: p.look }); fields.set({ ...base }); } } }))),
-      p.costume ? h('p', { class: 'ui-muted ui-small', text: 'A fantasia JMAL (rubi, dourado e coroa) é fixa do dono e não muda aqui.' }) : null,
+      p.costume ? h('p', { class: 'ui-muted ui-small', text: 'A fantasia JMAL (rubi, dourado e coroa) é o visual de partida do dono; as peças escolhidas valem por cima dela.' }) : null,
       fields.groups, aviso,
       h('div', { class: 'ui-char__actions' }, salvar, h('button', { class: 'ui-btn', type: 'button', text: 'Cancelar', on: { click: fechar } }),
-        p.custom ? h('button', { class: 'ui-link-btn ui-char__reset', type: 'button', text: 'Voltar ao sorteio', on: { click: () => void gravar({ reset: true }, 'O personagem voltou ao sorteio.') } }) : null),
+        p.custom ? h('button', { class: 'ui-link-btn ui-char__reset', type: 'button', text: p.costume ? 'Voltar ao padrão' : 'Voltar ao sorteio', on: { click: () => void gravar({ reset: true }, p.costume ? 'O personagem voltou ao padrão JMAL.' : 'O personagem voltou ao sorteio.') } }) : null),
     );
     this.aberto = painel;
     document.body.append(painel);
