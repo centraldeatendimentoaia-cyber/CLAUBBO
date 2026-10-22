@@ -33,3 +33,14 @@
 
 ## Fechamento de cada entrega
 `npm test`, teste no navegador, `npm run check`, `tsc -b`, `npm run build` e `npm run i18n:check` (sem texto novo sem tradução), commits pequenos em português.
+
+## Desenho da presença ao vivo (item 3)
+
+- **Canal:** o `/api/stream` (SSE) que já existe ganha o evento `presenca` com a lista inteira (`[{nome, papel, andar, x, y, dir}]`, x e y em tiles). Cada página manda a posição do próprio boneco com `POST /api/presenca` e sai com `POST /api/presenca/sair`.
+- **Quem vê e quem aparece:** só `dono` e `equipe` com nome, nunca o token dos agentes. A pessoa vem do servidor (`req.pessoa`), nunca do corpo. Quem não pode não recebe o evento no stream e leva 403 ao avisar.
+- **Estado:** só em memória, uma entrada por pessoa (nome sem diferenciar maiúscula). Duas abas da mesma pessoa viram um boneco só (vale o último aviso).
+- **Limite de taxa:** o servidor recusa (429) avisos com menos de 80 ms de intervalo da mesma pessoa, valida andar, posição e direção (422) e aceita até 100 pessoas (503 depois). O cliente manda no máximo 5 avisos por segundo e só quando o boneco mudou.
+- **Remoção:** fechar a última página da pessoa (conexão do stream cai) tira o boneco na hora; `sair` também; sem aviso por 8 s ele some (varredura a cada 2 s).
+- **Aparência:** a lista não leva aparência. O cliente pega o personagem editado de cada um em `/api/equipe` (a mesma fonte da barra da equipe) e atualiza quando alguém novo aparece ou `equipe:salvo` dispara.
+- **Escala para o escritório hospedado:** a chave da pessoa é o nome dela dentro de um escritório. Num servidor hospedado com login por escritório, basta uma instância de `criarPresenca` por escritório e o stream filtrado por ele; o formato da lista não muda.
+- **Celular:** `/api/presenca` e `/api/presenca/sair` entram em `PHONE_WRITES` (o boneco do celular anda mesmo sem `V2_CELULAR_ESCRITA`). O token do QR code é o "dono" do celular e aparece com o nome `celular`.
